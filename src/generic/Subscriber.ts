@@ -1,5 +1,9 @@
+import Logger, { LogLevel } from '../util/logger';
 import { MessageProcessor } from './MessageProcessor';
-
+import { EventHandler, ISubscription } from '../types/Connection';
+import { WampMessage } from '../types/Protocol';
+import { Deferred } from '../util/deferred';
+import { PendingMap } from '../util/map';
 import {
     EventDetails,
     SubscribeOptions,
@@ -8,9 +12,6 @@ import {
     WampUnsubscribedMessage,
     WampUnsubscribeMessage,
 } from '../types/messages/SubscribeMessage';
-
-import { Logger } from '../logging/Logger';
-import { EventHandler, ISubscription, LogLevel } from '../types/Connection';
 import {
     EWampMessageID,
     WampDict,
@@ -18,9 +19,6 @@ import {
     WampList,
     WampURI,
 } from '../types/messages/MessageTypes';
-import { WampMessage } from '../types/Protocol';
-import { Deferred } from '../util/deferred';
-import { PendingMap } from '../util/map';
 
 class MultiSubscription {
     public onUnsubscribed: Deferred<void>;

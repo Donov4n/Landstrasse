@@ -1,18 +1,19 @@
+import Logger, { LogLevel } from '../util/logger';
 import { CallOptions, ECallKillMode } from '../types/messages/CallMessage';
 import { HelloMessageDetails, WampHelloMessage } from '../types/messages/HelloMessage';
-import {
-    EWampMessageID,
-    WampDict,
-    WampID,
-    WampList,
-    WampURI,
-} from '../types/messages/MessageTypes';
 import { PublishOptions } from '../types/messages/PublishMessage';
 import { RegisterOptions } from '../types/messages/RegisterMessage';
 import { SubscribeOptions } from '../types/messages/SubscribeMessage';
 import { WampAbortMessage, WampChallengeMessage, WampMessage } from '../types/Protocol';
-
-import { Logger } from '../logging/Logger';
+import { WampWelcomeMessage, WelcomeDetails } from '../types/messages/WelcomeMessage';
+import { ETransportEventType, ITransport, TransportEvent } from '../types/Transport';
+import { GlobalIDGenerator, SessionIDGenerator } from '../util/id';
+import { IDGen, IMessageProcessorFactory } from './MessageProcessor';
+import { Publisher } from './Publisher';
+import { Subscriber } from './Subscriber';
+import { Callee } from './Callee';
+import { Caller } from './Caller';
+import { Deferred } from '../util/deferred';
 import {
     CallHandler,
     CallResult,
@@ -25,23 +26,19 @@ import {
     IPublication,
     IRegistration,
     ISubscription,
-    LogLevel,
 } from '../types/Connection';
-import { WampWelcomeMessage, WelcomeDetails } from '../types/messages/WelcomeMessage';
-import { ETransportEventType, ITransport, TransportEvent } from '../types/Transport';
-import { Deferred } from '../util/deferred';
-import { GlobalIDGenerator, SessionIDGenerator } from '../util/id';
-
-import { Callee } from './Callee';
-import { Caller } from './Caller';
+import {
+    EWampMessageID,
+    WampDict,
+    WampID,
+    WampList,
+    WampURI,
+} from '../types/messages/MessageTypes';
 import {
     ConnectionStateMachine,
     EConnectionState,
     EMessageDirection,
 } from './ConnectionStateMachine';
-import { IDGen, IMessageProcessorFactory } from './MessageProcessor';
-import { Publisher } from './Publisher';
-import { Subscriber } from './Subscriber';
 
 const createIdGens = () => {
     return {
@@ -71,13 +68,12 @@ export class Connection implements IConnection {
     private idGen: IDGen;
     private state: ConnectionStateMachine;
     constructor(private connectionOptions: ConnectionOptions) {
-        // TODO: Improve logging...
-        // tslint:disable-next-line
         this.connectionOptions.transportOptions =
             this.connectionOptions.transportOptions || {};
         this.state = new ConnectionStateMachine();
         this.idGen = createIdGens();
-        this.logger = new Logger('Connection.ts', connectionOptions.logFunction);
+
+        this.logger = new Logger(connectionOptions.logFunction, connectionOptions.debug);
     }
 
     public Open(): Promise<WelcomeDetails> {

@@ -1,6 +1,8 @@
 import { MessageProcessor } from './MessageProcessor';
-
-import { CallResult, LogLevel } from '../types/Connection';
+import { LogLevel } from '../util/logger';
+import { CallResult } from '../types/Connection';
+import { WampMessage } from '../types/Protocol';
+import { Deferred } from '../util/deferred';
 import {
     CallOptions,
     ECallKillMode,
@@ -14,8 +16,6 @@ import {
     WampList,
     WampURI,
 } from '../types/messages/MessageTypes';
-import { WampMessage } from '../types/Protocol';
-import { Deferred } from '../util/deferred';
 
 export class Caller extends MessageProcessor {
     public static GetFeatures(): WampDict {

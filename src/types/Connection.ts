@@ -1,9 +1,7 @@
 import { IAuthProvider } from './AuthProvider';
 import { ISerializer } from './Serializer';
 import { ITransportFactory } from './Transport';
-
-import { WampDict, WampID, WampList, WampURI } from './messages/MessageTypes';
-
+import { WampDict, WampID, WampList } from './messages/MessageTypes';
 import { CallOptions, ECallKillMode, InvocationDetails } from './messages/CallMessage';
 import { PublishOptions } from './messages/PublishMessage';
 import { RegisterOptions } from './messages/RegisterMessage';
@@ -18,12 +16,8 @@ export {
     ECallKillMode,
     EventDetails,
 };
-export enum LogLevel {
-    DEBUG = 'DEBUG',
-    INFO = 'INFO',
-    WARNING = 'WARNING',
-    ERROR = 'ERROR',
-}
+
+import type { LogFunction } from '../util/logger';
 
 export class ConnectionOpenError extends Error {
     constructor(reason: string, public details?: WampDict) {
@@ -42,13 +36,8 @@ export type ConnectionCloseInfo = {
     wasClean: boolean;
 };
 
-export type LogFunction = (
-    logLevel: LogLevel,
-    timestamp: Date,
-    fileName: string,
-    logText: string,
-) => void;
 export type ConnectionOptions = {
+    debug?: boolean,
     endpoint: string;
     serializer: ISerializer;
     transport: ITransportFactory;

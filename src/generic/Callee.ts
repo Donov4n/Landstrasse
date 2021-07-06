@@ -1,7 +1,12 @@
-import { Logger } from '../logging/Logger';
-import { CallHandler, CallResult, IRegistration, LogLevel } from '../types/Connection';
-
+import Logger, { LogLevel } from '../util/logger';
+import { CallHandler, CallResult, IRegistration } from '../types/Connection';
 import { InvocationDetails, WampYieldMessage } from '../types/messages/CallMessage';
+import { WampMessage } from '../types/Protocol';
+import { Deferred } from '../util/deferred';
+import { PendingMap } from '../util/map';
+import { MessageProcessor, ProtocolViolator } from './MessageProcessor';
+import { WampError } from './WampError';
+import { SerializationError } from '../transport/SerializationError';
 import {
     EWampMessageID,
     WampDict,
@@ -16,13 +21,6 @@ import {
     WampUnregisteredMessage,
     WampUnregisterMessage,
 } from '../types/messages/RegisterMessage';
-import { WampMessage } from '../types/Protocol';
-import { Deferred } from '../util/deferred';
-import { PendingMap } from '../util/map';
-
-import { MessageProcessor, ProtocolViolator } from './MessageProcessor';
-import { WampError } from './WampError';
-import { SerializationError } from '../transport/SerializationError';
 
 class Registration implements IRegistration {
     public onUnregistered = new Deferred<void>();

@@ -1,6 +1,7 @@
 import { MessageProcessor } from './MessageProcessor';
 
-import { IPublication, LogLevel } from '../types/Connection';
+import { LogLevel } from '../util/logger';
+import { IPublication } from '../types/Connection';
 import {
     EWampMessageID,
     WampDict,
