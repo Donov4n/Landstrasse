@@ -1,24 +1,19 @@
-import { MessageProcessor } from './MessageProcessor';
-
+import AbstractProcessor from './AbstractProcessor';
+import Deferred from '../util/deferred';
+import PendingMap from '../util/map';
 import { LogLevel } from '../util/logger';
-import { IPublication } from '../types/Connection';
-import {
-    EWampMessageID,
-    WampDict,
-    WampID,
-    WampList,
-    WampURI,
-} from '../types/messages/MessageTypes';
-import {
+import { EWampMessageID } from '../types/messages/MessageTypes';
+
+import type { PublicationInterface } from '../types/Connection';
+import type { WampMessage } from '../types/Protocol';
+import { WampDict, WampID, WampList, WampURI } from '../types/messages/MessageTypes';
+import type {
     PublishOptions,
     WampPublishedMessage,
     WampPublishMessage,
 } from '../types/messages/PublishMessage';
-import { WampMessage } from '../types/Protocol';
-import { Deferred } from '../util/deferred';
-import { PendingMap } from '../util/map';
 
-export class Publication implements IPublication {
+export class Publication implements PublicationInterface {
     private onPublished = new Deferred<WampID | null>();
     private resolved = false;
     constructor(private requestID: WampID, expectAck: boolean) {
@@ -48,7 +43,7 @@ export class Publication implements IPublication {
     }
 }
 
-export class Publisher extends MessageProcessor {
+class Publisher extends AbstractProcessor {
     public static GetFeatures(): WampDict {
         return {
             publisher: {
@@ -72,7 +67,7 @@ export class Publisher extends MessageProcessor {
         args?: A,
         kwArgs?: K,
         options?: PublishOptions,
-    ): Promise<IPublication> {
+    ): Promise<PublicationInterface> {
         if (this.closed) {
             throw new Error('Publisher already closed');
         }
@@ -122,3 +117,5 @@ export class Publisher extends MessageProcessor {
         return handled;
     }
 }
+
+export default Publisher;

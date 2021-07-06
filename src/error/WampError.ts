@@ -1,11 +1,7 @@
-import { WampErrorMessage } from '../types/Protocol';
-import {
-    EWampMessageID,
-    WampDict,
-    WampID,
-    WampList,
-    WampURI,
-} from '../types/messages/MessageTypes';
+import { EWampMessageID } from '../types/messages/MessageTypes';
+
+import type { WampErrorMessage } from '../types/Protocol';
+import type { WampDict, WampID, WampList, WampURI } from '../types/messages/MessageTypes';
 
 class WampError<TArgs extends WampList = WampList, TKwArgs extends WampDict = WampDict> {
     constructor(public errorUri: WampURI, public args?: TArgs, public kwArgs?: TKwArgs) {}
@@ -23,4 +19,4 @@ class WampError<TArgs extends WampList = WampList, TKwArgs extends WampDict = Wa
     }
 }
 
-export { WampError };
+export default WampError;

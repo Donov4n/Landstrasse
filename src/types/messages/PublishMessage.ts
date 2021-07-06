@@ -1,4 +1,5 @@
 import { EWampMessageID, WampID, WampURI, WampList, WampDict } from './MessageTypes';
+
 export type PublishOptions = {
     acknowledge?: boolean;
     exclude_me?: boolean;

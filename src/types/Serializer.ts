@@ -1,23 +1,24 @@
-import { WampMessage } from './Protocol';
+import type { WampMessage } from './Protocol';
 
-export interface IBaseSerializer {
+export interface BaseSerializerInterface {
     ProtocolID(): string;
     IsBinary(): boolean;
 }
 
-export function IsBinarySerializer(ser: ISerializer): ser is IBinarySerializer {
+export function IsBinarySerializer(ser: SerializerInterface): ser is BinarySerializerInterface {
     return ser.IsBinary();
 }
 
-export interface ITextSerializer extends IBaseSerializer {
+export interface TextSerializerInterface extends BaseSerializerInterface {
     Serialize(msg: WampMessage): string;
     Deserialize(msg: string): WampMessage;
 }
 
-export interface IBinarySerializer extends IBaseSerializer {
+export interface BinarySerializerInterface extends BaseSerializerInterface {
     Serialize(msg: WampMessage): ArrayBufferLike;
     Deserialize(msg: ArrayBufferLike): WampMessage;
 }
 
-export type ISerializer = ITextSerializer | IBinarySerializer;
+export type SerializerInterface = TextSerializerInterface | BinarySerializerInterface;
+
 export { WampMessage };

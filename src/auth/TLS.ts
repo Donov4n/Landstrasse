@@ -1,13 +1,13 @@
-import { TransportLevelProvider } from './TransportProvider';
+import AbstractAuthProvider from './AbstractAuthProvider';
 
 /**
  * TLS Client Certificate authentication provider.
+ *
  * Providing an instance of this class means that the client thinks
  * that it is already authenticated by presenting a TLS client cert on the
  * transport level.
- * @category auth
  */
-export class TLSAuthProvider extends TransportLevelProvider {
+class TLSAuthProvider extends AbstractAuthProvider {
     /**
      * Creates a new instance of the TLS auth provider.
      * @param authid Username to login as. A certificate might permit logging
@@ -19,3 +19,5 @@ export class TLSAuthProvider extends TransportLevelProvider {
         super(authid || '', 'tls');
     }
 }
+
+export default TLSAuthProvider;

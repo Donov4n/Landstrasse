@@ -1,11 +1,5 @@
-// Export basic types
-export {
-    WampID,
-    WampURI,
-    WampDict,
-    WampList,
-    EMatchPolicy,
-} from './types/messages/MessageTypes';
+export type { WampID, WampURI, WampDict, WampList, EMatchPolicy } from './types/messages/MessageTypes';
+export type { WelcomeDetails } from './types/messages/WelcomeMessage';
 
 // Export public interfaces to interact with the library
 export * from './types/Serializer';
@@ -13,21 +7,14 @@ export * from './types/Transport';
 export * from './types/AuthProvider';
 export * from './types/Connection';
 
-export { WelcomeDetails } from './types/messages/WelcomeMessage';
-
-// Export different transports
-export { BrowserWebSocketTransport } from './transport/BrowserWebSocketTransport';
-
-// Export different serializers
-export { JSONSerializer } from './serialize/JSON';
-
 // Export the different authentication providers
-export { TransportLevelProvider } from './auth/TransportProvider';
-export { TLSAuthProvider } from './auth/TLS';
-export { TicketAuthProvider } from './auth/Ticket';
-export { CookieAuthProvider } from './auth/Cookie';
-export { AnonymousAuthProvider } from './auth/Anonymous';
+export { default as AbstractAuthProvider } from './auth/AbstractAuthProvider';
+export { default as TLSAuthProvider } from './auth/TLS';
+export { default as TicketAuthProvider } from './auth/Ticket';
+export { default as CookieAuthProvider } from './auth/Cookie';
+export { default as AnonymousAuthProvider } from './auth/Anonymous';
 
 // Export the main connection object
-export { Connection } from './generic/Connection';
-export { WampError } from './generic/WampError';
+export { default as WampError } from './error/WampError';
+
+export { Connection as default } from './connection';

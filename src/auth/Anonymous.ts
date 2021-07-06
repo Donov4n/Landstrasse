@@ -1,11 +1,10 @@
-import { TransportLevelProvider } from './TransportProvider';
+import AbstractAuthProvider from './AbstractAuthProvider';
 
 /**
  * AnonymousAuthProvider is a class used to represent a login without a password.
  * It uses the authmethod `anonymous` and a configurable authid (username).
- * @category auth
  */
-export class AnonymousAuthProvider extends TransportLevelProvider {
+class AnonymousAuthProvider extends AbstractAuthProvider {
     /**
      * Creates a new instance of the AnonymousAuthProvider.
      * @param authid The username to authenticate as (default: `anonymous`)
@@ -14,3 +13,5 @@ export class AnonymousAuthProvider extends TransportLevelProvider {
         super(authid || 'anonymous', 'anonymous');
     }
 }
+
+export default AnonymousAuthProvider;

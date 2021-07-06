@@ -1,20 +1,17 @@
+import AbstractProcessor from './AbstractProcessor';
 import Logger, { LogLevel } from '../util/logger';
-import { CallHandler, CallResult, IRegistration } from '../types/Connection';
-import { InvocationDetails, WampYieldMessage } from '../types/messages/CallMessage';
-import { WampMessage } from '../types/Protocol';
-import { Deferred } from '../util/deferred';
-import { PendingMap } from '../util/map';
-import { MessageProcessor, ProtocolViolator } from './MessageProcessor';
-import { WampError } from './WampError';
-import { SerializationError } from '../transport/SerializationError';
-import {
-    EWampMessageID,
-    WampDict,
-    WampID,
-    WampList,
-    WampURI,
-} from '../types/messages/MessageTypes';
-import {
+import WampError from '../error/WampError';
+import SerializationError from '../error/SerializationError';
+import Deferred from '../util/deferred';
+import PendingMap from '../util/map';
+import { EWampMessageID } from '../types/messages/MessageTypes';
+
+import type { WampMessage } from '../types/Protocol';
+import type { ProtocolViolator } from './AbstractProcessor';
+import type { CallHandler, CallResult, RegistrationInterface } from '../types/Connection';
+import type { InvocationDetails, WampYieldMessage } from '../types/messages/CallMessage';
+import type { WampDict, WampID, WampList, WampURI, } from '../types/messages/MessageTypes';
+import type {
     RegisterOptions,
     WampRegisteredMessage,
     WampRegisterMessage,
@@ -22,7 +19,7 @@ import {
     WampUnregisterMessage,
 } from '../types/messages/RegisterMessage';
 
-class Registration implements IRegistration {
+class Registration implements RegistrationInterface {
     public onUnregistered = new Deferred<void>();
     constructor(
         private id: WampID,
@@ -161,7 +158,7 @@ class Call {
     }
 }
 
-export class Callee extends MessageProcessor {
+class Callee extends AbstractProcessor {
     public static GetFeatures(): WampDict {
         return {
             callee: {
@@ -210,7 +207,7 @@ export class Callee extends MessageProcessor {
         uri: string,
         handler: CallHandler<A, K, RA, RK>,
         options?: RegisterOptions,
-    ): Promise<IRegistration> {
+    ): Promise<RegistrationInterface> {
         if (this.closed) {
             return Promise.reject('callee closed');
         }
@@ -345,3 +342,5 @@ export class Callee extends MessageProcessor {
         }
     }
 }
+
+export default Callee;

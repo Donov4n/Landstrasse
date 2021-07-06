@@ -26,7 +26,8 @@
         "build"
     ],
     "scripts": {
-        "build": "tsc -p tsconfig.module.json && tsc -p tsconfig.cjs.json"
+        "build": "tsc -p tsconfig.module.json && tsc -p tsconfig.cjs.json",
+        "check-types": "tsc"
     },
     "devDependencies": {
         "typescript": "^4.3.5"

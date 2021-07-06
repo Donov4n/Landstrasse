@@ -1,6 +1,6 @@
 export type StateTransitionFunction<EState, TArgs> = (args: TArgs) => EState | null;
 
-export class StateMachine<EState, TArgs> {
+class StateMachine<EState, TArgs> {
     private currentState: EState;
 
     constructor(
@@ -26,3 +26,5 @@ export class StateMachine<EState, TArgs> {
         return this.currentState;
     }
 }
+
+export default StateMachine;

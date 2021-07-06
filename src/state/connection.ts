@@ -1,5 +1,7 @@
+import StateMachine from '.';
 import { EWampMessageID } from '../types/messages/MessageTypes';
-import { StateMachine, StateTransitionFunction } from './StateMachine';
+
+import type { StateTransitionFunction } from '.';
 
 export enum EConnectionState {
     CLOSED = 'CLOSED',

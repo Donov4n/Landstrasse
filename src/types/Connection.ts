@@ -1,7 +1,3 @@
-import { IAuthProvider } from './AuthProvider';
-import { ISerializer } from './Serializer';
-import { ITransportFactory } from './Transport';
-import { WampDict, WampID, WampList } from './messages/MessageTypes';
 import { CallOptions, ECallKillMode, InvocationDetails } from './messages/CallMessage';
 import { PublishOptions } from './messages/PublishMessage';
 import { RegisterOptions } from './messages/RegisterMessage';
@@ -17,18 +13,10 @@ export {
     EventDetails,
 };
 
+import type { SerializerInterface } from './Serializer';
+import type { WampDict, WampID, WampList } from './messages/MessageTypes';
+import type { AuthProviderInterface } from './AuthProvider';
 import type { LogFunction } from '../util/logger';
-
-export class ConnectionOpenError extends Error {
-    constructor(reason: string, public details?: WampDict) {
-        super(reason);
-    }
-}
-export class ConnectionCloseError extends Error {
-    constructor(reason: string, public code: number) {
-        super(reason);
-    }
-}
 
 export type ConnectionCloseInfo = {
     reason: string;
@@ -39,12 +27,10 @@ export type ConnectionCloseInfo = {
 export type ConnectionOptions = {
     debug?: boolean,
     endpoint: string;
-    serializer: ISerializer;
-    transport: ITransportFactory;
-    authProvider: IAuthProvider;
     realm: string;
+    serializer?: SerializerInterface;
+    authProvider?: AuthProviderInterface;
     logFunction?: LogFunction;
-    transportOptions?: WampDict;
 };
 
 export type CallResult<TArgs extends WampList, TKwArgs extends WampDict> = {
@@ -70,23 +56,23 @@ export type EventHandler<TA extends WampList, TKwA extends WampDict> = (
     details: EventDetails,
 ) => void;
 
-export interface IRegistration {
+export interface RegistrationInterface {
     Unregister(): Promise<void>;
     OnUnregistered(): Promise<void>;
     ID(): WampID;
 }
 
-export interface ISubscription {
+export interface SubscriptionInterface {
     Unsubscribe(): Promise<void>;
     OnUnsubscribed(): Promise<void>;
     ID(): WampID;
 }
 
-export interface IPublication {
+export interface PublicationInterface {
     OnPublished(): Promise<WampID | null>;
 }
 
-export interface IConnection {
+export interface ConnectionInterface {
     Open(): Promise<WelcomeDetails>;
     Close(): Promise<ConnectionCloseInfo>;
     OnClose(): Promise<ConnectionCloseInfo>;
@@ -115,18 +101,18 @@ export interface IConnection {
         uri: string,
         handler: CallHandler<A, K, RA, RK>,
         options?: RegisterOptions,
-    ): Promise<IRegistration>;
+    ): Promise<RegistrationInterface>;
 
     Publish<A extends WampList, K extends WampDict>(
         topic: string,
         args?: A,
         kwArgs?: K,
         options?: PublishOptions,
-    ): Promise<IPublication>;
+    ): Promise<PublicationInterface>;
 
     Subscribe<A extends WampList, K extends WampDict>(
         topic: string,
         handler: EventHandler<A, K>,
         options?: SubscribeOptions,
-    ): Promise<ISubscription>;
+    ): Promise<SubscriptionInterface>;
 }

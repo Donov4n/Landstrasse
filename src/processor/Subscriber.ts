@@ -1,10 +1,13 @@
+import AbstractProcessor from './AbstractProcessor';
 import Logger, { LogLevel } from '../util/logger';
-import { MessageProcessor } from './MessageProcessor';
-import { EventHandler, ISubscription } from '../types/Connection';
-import { WampMessage } from '../types/Protocol';
-import { Deferred } from '../util/deferred';
-import { PendingMap } from '../util/map';
-import {
+import Deferred from '../util/deferred';
+import PendingMap from '../util/map';
+import { EWampMessageID } from '../types/messages/MessageTypes';
+
+import type { EventHandler, SubscriptionInterface } from '../types/Connection';
+import type { WampMessage } from '../types/Protocol';
+import type { WampDict, WampID, WampList, WampURI } from '../types/messages/MessageTypes';
+import type {
     EventDetails,
     SubscribeOptions,
     WampSubscribedMessage,
@@ -12,13 +15,6 @@ import {
     WampUnsubscribedMessage,
     WampUnsubscribeMessage,
 } from '../types/messages/SubscribeMessage';
-import {
-    EWampMessageID,
-    WampDict,
-    WampID,
-    WampList,
-    WampURI,
-} from '../types/messages/MessageTypes';
 
 class MultiSubscription {
     public onUnsubscribed: Deferred<void>;
@@ -93,7 +89,7 @@ class MultiSubscription {
     }
 }
 
-class Subscription implements ISubscription {
+class Subscription implements SubscriptionInterface {
     public onUnsubscribed = new Deferred<void>();
 
     constructor(
@@ -117,7 +113,7 @@ class Subscription implements ISubscription {
     }
 }
 
-export class Subscriber extends MessageProcessor {
+class Subscriber extends AbstractProcessor {
     public static GetFeatures(): WampDict {
         return {
             subscriber: {
@@ -159,7 +155,7 @@ export class Subscriber extends MessageProcessor {
         topic: WampURI,
         handler: EventHandler<A, K>,
         options?: SubscribeOptions,
-    ): Promise<ISubscription> {
+    ): Promise<SubscriptionInterface> {
         if (this.closed) {
             throw new Error('Subscriber already closed');
         }
@@ -269,3 +265,5 @@ export class Subscriber extends MessageProcessor {
         }
     }
 }
+
+export default Subscriber;

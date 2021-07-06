@@ -1,31 +1,34 @@
 import Logger from '../util/logger';
-import { WampDict } from '../types/messages/MessageTypes';
-import { WampMessage } from '../types/Protocol';
-import { IIDGenerator } from '../util/id';
+
+import type { IDGeneratorInterface } from '../util/id';
+import type { WampDict } from '../types/messages/MessageTypes';
+import type { WampMessage } from '../types/Protocol';
 
 export type MessageSender = (msg: WampMessage) => Promise<void>;
 export type ProtocolViolator = (msg: string) => void;
 export type IDGen = {
-    global: IIDGenerator;
-    session: IIDGenerator;
+    global: IDGeneratorInterface;
+    session: IDGeneratorInterface;
 };
 
-export interface IMessageProcessorFactory {
+export interface ProcessorInterface {
+    Close(): void;
+    ProcessMessage(msg: WampMessage): boolean;
+}
+
+export interface ProcessorFactoryInterface {
     new (
         sender: MessageSender,
         violator: ProtocolViolator,
         idGen: IDGen,
         logger: Logger,
-    ): IMessageProcessor;
+    ): ProcessorInterface;
     GetFeatures(): WampDict;
 }
-export interface IMessageProcessor {
-    Close(): void;
-    ProcessMessage(msg: WampMessage): boolean;
-}
 
-export abstract class MessageProcessor {
+abstract class AbstractProcessor {
     protected closed = false;
+
     constructor(
         protected sender: MessageSender,
         protected violator: ProtocolViolator,
@@ -48,3 +51,5 @@ export abstract class MessageProcessor {
     protected abstract onClose(): void;
     protected abstract onMessage(msg: WampMessage): boolean;
 }
+
+export default AbstractProcessor;

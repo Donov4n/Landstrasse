@@ -1,7 +1,8 @@
 import { WampMessage } from '../types/Protocol';
-import { ITextSerializer } from '../types/Serializer';
 
-export class JSONSerializer implements ITextSerializer {
+import type { TextSerializerInterface } from '../types/Serializer';
+
+class JSONSerializer implements TextSerializerInterface {
     public IsBinary(): boolean {
         return false;
     }
@@ -18,3 +19,5 @@ export class JSONSerializer implements ITextSerializer {
         return JSON.parse(msg);
     }
 }
+
+export default JSONSerializer;

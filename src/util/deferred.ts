@@ -1,4 +1,4 @@
-export class Deferred<T> {
+class Deferred<T> {
     public promise: Promise<T>;
     private resolveInternal?: (v: T) => void;
     private rejectInternal?: (reason?: any) => void;
@@ -18,3 +18,5 @@ export class Deferred<T> {
         this.rejectInternal!(err);
     }
 }
+
+export default Deferred;

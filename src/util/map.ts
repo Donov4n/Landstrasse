@@ -1,8 +1,10 @@
-import { Deferred } from './deferred';
-import { EWampMessageID, WampID } from '../types/messages/MessageTypes';
-import { WampMessage } from '../types/Protocol';
+import Deferred from './deferred';
+import { EWampMessageID } from '../types/messages/MessageTypes';
 
-export class PendingMap<TSucMsg extends WampMessage> {
+import type { WampID } from '../types/messages/MessageTypes';
+import type { WampMessage } from '../types/Protocol';
+
+class PendingMap<TSucMsg extends WampMessage> {
     private pendings = new Map<WampID, Deferred<TSucMsg>>();
     private closed = false;
 
@@ -75,3 +77,5 @@ export class PendingMap<TSucMsg extends WampMessage> {
         return val || null;
     }
 }
+
+export default PendingMap;

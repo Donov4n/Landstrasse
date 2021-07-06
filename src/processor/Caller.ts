@@ -1,23 +1,19 @@
-import { MessageProcessor } from './MessageProcessor';
+import AbstractProcessor from './AbstractProcessor';
+import Deferred from '../util/deferred';
 import { LogLevel } from '../util/logger';
-import { CallResult } from '../types/Connection';
-import { WampMessage } from '../types/Protocol';
-import { Deferred } from '../util/deferred';
-import {
+import { EWampMessageID } from '../types/messages/MessageTypes';
+
+import type { CallResult } from '../types/Connection';
+import type { WampMessage } from '../types/Protocol';
+import type { WampDict, WampID, WampList, WampURI } from '../types/messages/MessageTypes';
+import type {
     CallOptions,
     ECallKillMode,
     WampCallMessage,
     WampCancelMessage,
 } from '../types/messages/CallMessage';
-import {
-    EWampMessageID,
-    WampDict,
-    WampID,
-    WampList,
-    WampURI,
-} from '../types/messages/MessageTypes';
 
-export class Caller extends MessageProcessor {
+class Caller extends AbstractProcessor {
     public static GetFeatures(): WampDict {
         return {
             caller: {
@@ -169,3 +165,5 @@ export class Caller extends MessageProcessor {
         return false;
     }
 }
+
+export default Caller;

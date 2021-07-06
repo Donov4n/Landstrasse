@@ -1,7 +1,4 @@
-import { WampMessage } from './Protocol';
-import { ISerializer } from './Serializer';
-
-import { WampDict } from './messages/MessageTypes';
+import type { WampMessage } from './Protocol';
 
 export enum ETransportEventType {
     OPEN,
@@ -29,12 +26,7 @@ export type TransportEvent =
           wasClean: boolean;
       };
 
-export interface ITransportFactory {
-    new (serializer: ISerializer, options?: WampDict): ITransport;
-}
-
-export interface ITransport {
-    name: string;
+export interface TransportInterface {
     Open(endpoint: string, callback: (ev: TransportEvent) => void): void;
     Close(code: number, reason: string): void;
     Send(message: WampMessage): Promise<void>;

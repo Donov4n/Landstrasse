@@ -1,44 +1,46 @@
-import Logger, { LogLevel } from '../util/logger';
-import { CallOptions, ECallKillMode } from '../types/messages/CallMessage';
-import { HelloMessageDetails, WampHelloMessage } from '../types/messages/HelloMessage';
-import { PublishOptions } from '../types/messages/PublishMessage';
-import { RegisterOptions } from '../types/messages/RegisterMessage';
-import { SubscribeOptions } from '../types/messages/SubscribeMessage';
-import { WampAbortMessage, WampChallengeMessage, WampMessage } from '../types/Protocol';
-import { WampWelcomeMessage, WelcomeDetails } from '../types/messages/WelcomeMessage';
-import { ETransportEventType, ITransport, TransportEvent } from '../types/Transport';
-import { GlobalIDGenerator, SessionIDGenerator } from '../util/id';
-import { IDGen, IMessageProcessorFactory } from './MessageProcessor';
-import { Publisher } from './Publisher';
-import { Subscriber } from './Subscriber';
-import { Callee } from './Callee';
-import { Caller } from './Caller';
-import { Deferred } from '../util/deferred';
-import {
-    CallHandler,
-    CallResult,
-    ConnectionCloseError,
-    ConnectionCloseInfo,
-    ConnectionOpenError,
-    ConnectionOptions,
-    EventHandler,
-    IConnection,
-    IPublication,
-    IRegistration,
-    ISubscription,
-} from '../types/Connection';
-import {
-    EWampMessageID,
-    WampDict,
-    WampID,
-    WampList,
-    WampURI,
-} from '../types/messages/MessageTypes';
+import WebSocketTransport from './transport';
+import JSONSerializer from './serializer/json';
+import Deferred from './util/deferred';
+import Logger, { LogLevel } from './util/logger';
+import ConnectionOpenError from './error/ConnectionOpenError';
+import ConnectionCloseError from './error/ConnectionCloseError';
+import { ETransportEventType } from './types/Transport';
+import { GlobalIDGenerator, SessionIDGenerator } from './util/id';
+import { EWampMessageID } from './types/messages/MessageTypes';
 import {
     ConnectionStateMachine,
     EConnectionState,
     EMessageDirection,
-} from './ConnectionStateMachine';
+} from './state/connection';
+
+import Publisher from './processor/Publisher';
+import Subscriber from './processor/Subscriber';
+import Callee from './processor/Callee';
+import Caller from './processor/Caller';
+
+import type { CallOptions, ECallKillMode } from './types/messages/CallMessage';
+import type { HelloMessageDetails, WampHelloMessage } from './types/messages/HelloMessage';
+import type { PublishOptions } from './types/messages/PublishMessage';
+import type { RegisterOptions } from './types/messages/RegisterMessage';
+import type { WampAbortMessage, WampChallengeMessage, WampMessage } from './types/Protocol';
+import type { WampWelcomeMessage, WelcomeDetails } from './types/messages/WelcomeMessage';
+import type { IDGen, ProcessorFactoryInterface } from './processor/AbstractProcessor';
+import type { TransportInterface, TransportEvent } from './types/Transport';
+import type { SubscribeOptions } from './types/messages/SubscribeMessage';
+import type { AuthProviderInterface } from './types/AuthProvider';
+import type { SerializerInterface } from './types/Serializer';
+import type { WampDict, WampID, WampList, WampURI, } from './types/messages/MessageTypes';
+import type {
+    CallHandler,
+    CallResult,
+    ConnectionCloseInfo,
+    ConnectionOptions,
+    EventHandler,
+    ConnectionInterface,
+    PublicationInterface,
+    RegistrationInterface,
+    SubscriptionInterface,
+} from './types/Connection';
 
 const createIdGens = () => {
     return {
@@ -47,32 +49,30 @@ const createIdGens = () => {
     };
 };
 
-export class Connection implements IConnection {
+export class Connection implements ConnectionInterface {
     public sessionId: number | null = null;
 
-    private transport: ITransport | null = null;
+    private transport: TransportInterface | null = null;
     private onOpen: Deferred<WelcomeDetails> | null = null;
     private onClose: Deferred<ConnectionCloseInfo> | null = null;
 
     // The type of subHandlers has to match the order of the Factories in subFactories
     private subHandlers: [Publisher, Subscriber, Caller, Callee] | null = null;
-    private subFactories: IMessageProcessorFactory[] = [
-        Publisher,
-        Subscriber,
-        Caller,
-        Callee,
-    ];
-
-    private readonly logger: Logger;
+    private subFactories: ProcessorFactoryInterface[] = [Publisher, Subscriber, Caller, Callee];
 
     private idGen: IDGen;
     private state: ConnectionStateMachine;
+
+    private serializer: SerializerInterface;
+    private authProvider: AuthProviderInterface | null;
+
+    private readonly logger: Logger;
+
     constructor(private connectionOptions: ConnectionOptions) {
-        this.connectionOptions.transportOptions =
-            this.connectionOptions.transportOptions || {};
         this.state = new ConnectionStateMachine();
         this.idGen = createIdGens();
-
+        this.serializer = this.connectionOptions?.serializer ?? new JSONSerializer();
+        this.authProvider = this.connectionOptions?.authProvider ?? null;
         this.logger = new Logger(connectionOptions.logFunction, connectionOptions.debug);
     }
 
@@ -80,10 +80,8 @@ export class Connection implements IConnection {
         if (!!this.transport) {
             return Promise.reject('Transport already opened or opening');
         }
-        this.transport = new this.connectionOptions.transport(
-            this.connectionOptions.serializer,
-            this.connectionOptions.transportOptions,
-        );
+
+        this.transport = new WebSocketTransport(this.serializer);
         this.state = new ConnectionStateMachine();
         this.onOpen = new Deferred();
         this.transport.Open(
@@ -91,12 +89,7 @@ export class Connection implements IConnection {
             this.handleTransportEvent.bind(this),
         );
 
-        this.logger.log(
-            LogLevel.DEBUG,
-            `Opened Connection with ${this.connectionOptions.serializer.ProtocolID()} and ${
-                this.transport.name
-            }`,
-        );
+        this.logger.log(LogLevel.DEBUG, 'Connection opened.');
         return this.onOpen.promise;
     }
 
@@ -155,7 +148,7 @@ export class Connection implements IConnection {
         uri: WampURI,
         handler: CallHandler<A, K, RA, RK>,
         opts?: RegisterOptions,
-    ): Promise<IRegistration> {
+    ): Promise<RegistrationInterface> {
         if (!this.subHandlers) {
             return Promise.reject('invalid session state');
         }
@@ -165,7 +158,7 @@ export class Connection implements IConnection {
         uri: WampURI,
         handler: EventHandler<A, K>,
         opts?: SubscribeOptions,
-    ): Promise<ISubscription> {
+    ): Promise<SubscriptionInterface> {
         if (!this.subHandlers) {
             return Promise.reject('invalid session state');
         }
@@ -176,7 +169,7 @@ export class Connection implements IConnection {
         args?: A,
         kwargs?: K,
         opts?: PublishOptions,
-    ): Promise<IPublication> {
+    ): Promise<PublicationInterface> {
         if (!this.subHandlers) {
             return Promise.reject('invalid session state');
         }
@@ -237,9 +230,9 @@ export class Connection implements IConnection {
             roles: Object.assign({}, ...this.subFactories.map((j) => j.GetFeatures())),
         };
 
-        if (!!this.connectionOptions.authProvider) {
-            details.authid = this.connectionOptions.authProvider.AuthID();
-            details.authmethods = [this.connectionOptions.authProvider.AuthMethod()];
+        if (this.authProvider) {
+            details.authid = this.authProvider.AuthID();
+            details.authmethods = [this.authProvider.AuthMethod()];
         }
 
         const msg: WampHelloMessage = [
@@ -247,31 +240,38 @@ export class Connection implements IConnection {
             this.connectionOptions.realm,
             details,
         ];
-        this.transport!.Send(msg).then(
-            () => {
-                this.state.update([EMessageDirection.SENT, EWampMessageID.HELLO]);
-            },
-            (err) => {
-                this.handleProtocolViolation(`Transport error: ${err}`);
-            },
+        this.transport!.Send(msg).then(//-
+            () => { this.state.update([EMessageDirection.SENT, EWampMessageID.HELLO]); },
+            (err) => { this.handleProtocolViolation(`Transport error: ${err}`); },
         );
     }
+
+    //
+    // - Processors.
+    //
 
     private processSessionMessage(msg: WampMessage): void {
         if (!this.transport) {
             return;
         }
+
         this.state.update([EMessageDirection.RECEIVED, msg[0]]);
         switch (this.state.getState()) {
             case EConnectionState.CHALLENGING: {
                 const challengeMsg = msg as WampChallengeMessage;
-                this.connectionOptions.authProvider
+                if (!this.authProvider) {
+                    this.logger.log(LogLevel.ERROR, 'Received WAMP challenge, but no auth provider set.');
+                    this.transport.Close(3000, 'Authentication failed');
+                    return;
+                }
+
+                this.authProvider
                     .ComputeChallenge(challengeMsg[2] || {})
                     .then((signature) => {
                         if (!this.transport) {
                             return;
                         }
-                        return this.transport.Send([
+                        return this.transport.Send([//-
                             EWampMessageID.AUTHENTICATE,
                             signature.signature,
                             signature.details || {},
@@ -289,7 +289,7 @@ export class Connection implements IConnection {
                         }
                         this.logger.log(LogLevel.WARNING, [
                             'Failed to compute challenge or send for auth provider',
-                            this.connectionOptions.authProvider,
+                            this.authProvider,
                             error,
                         ]);
                         this.transport.Close(3000, 'Authentication failed');
@@ -301,7 +301,7 @@ export class Connection implements IConnection {
                 this.subHandlers = this.subFactories.map((handlerClass) => {
                     return new handlerClass(
                         async (msgToSend) => {
-                            await this.transport!.Send(msgToSend);
+                            await this.transport!.Send(msgToSend); //-
                         },
                         (reason) => {
                             this.handleProtocolViolation(reason);
@@ -318,12 +318,7 @@ export class Connection implements IConnection {
                 const [, sessionId, welcomeDetails] = estabishedMessage;
 
                 this.sessionId = sessionId;
-                this.logger.log(
-                    LogLevel.DEBUG,
-                    `Opened Connection with ${this.connectionOptions.serializer.ProtocolID()} and ${
-                        this.transport.name
-                    }`,
-                );
+                this.logger.log(LogLevel.DEBUG, `Connection established.`);
                 this.handleOnOpen(welcomeDetails);
                 break;
             }
@@ -376,6 +371,10 @@ export class Connection implements IConnection {
             this.handleProtocolViolation('no handler found for message');
         }
     }
+
+    //
+    // - Handlers.
+    //
 
     private handleProtocolViolation(reason: WampURI): void {
         if (!this.transport) {

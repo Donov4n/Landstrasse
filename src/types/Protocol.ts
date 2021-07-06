@@ -1,3 +1,6 @@
+import { WampHelloMessage } from './messages/HelloMessage';
+import { WampWelcomeMessage } from './messages/WelcomeMessage';
+import { WampPublishedMessage, WampPublishMessage } from './messages/PublishMessage';
 import {
     EWampMessageID,
     WampDict,
@@ -5,10 +8,6 @@ import {
     WampList,
     WampURI,
 } from './messages/MessageTypes';
-
-import { WampHelloMessage } from './messages/HelloMessage';
-import { WampWelcomeMessage } from './messages/WelcomeMessage';
-
 import {
     WampCallMessage,
     WampCancelMessage,
@@ -17,9 +16,6 @@ import {
     WampResultMessage,
     WampYieldMessage,
 } from './messages/CallMessage';
-
-import { WampPublishedMessage, WampPublishMessage } from './messages/PublishMessage';
-
 import {
     WampEventMessage,
     WampSubscribedMessage,
@@ -27,7 +23,6 @@ import {
     WampUnsubscribedMessage,
     WampUnsubscribeMessage,
 } from './messages/SubscribeMessage';
-
 import {
     WampRegisteredMessage,
     WampRegisterMessage,

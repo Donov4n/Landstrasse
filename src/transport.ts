@@ -1,27 +1,16 @@
-import { WampDict } from '../types/messages/MessageTypes';
-import { WampMessage } from '../types/Protocol';
-import { IsBinarySerializer, ISerializer } from '../types/Serializer';
-import { ETransportEventType, ITransport, TransportEvent } from '../types/Transport';
-import { SerializationError } from './SerializationError';
+import { IsBinarySerializer } from './types/Serializer';
+import { ETransportEventType } from './types/Transport';
+import SerializationError from './error/SerializationError';
 
-export interface IWebSocketFactory {
-    new (
-        endpoint: string,
-        protocol?: string | string[],
-        transportOptions?: WampDict,
-    ): WebSocket;
-}
+import type { WampMessage } from './types/Protocol';
+import type { SerializerInterface } from './types/Serializer';
+import type { TransportInterface, TransportEvent } from './types/Transport';
 
-export abstract class WebSocketTransport implements ITransport {
+class WebSocketTransport implements TransportInterface {
     protected webSocket: WebSocket | null = null;
     private callback: ((ev: TransportEvent) => void) | null = null;
 
-    constructor(
-        public name: string,
-        private serializer: ISerializer,
-        private webSocketFactory: IWebSocketFactory,
-        private transportOptions?: WampDict,
-    ) {}
+    constructor(private serializer: SerializerInterface) {}
 
     public Open(endpoint: string, cb: (ev: TransportEvent) => void) {
         if (!!this.webSocket) {
@@ -32,34 +21,22 @@ export abstract class WebSocketTransport implements ITransport {
             return;
         }
 
-        this.webSocket = new this.webSocketFactory(
-            endpoint,
-            this.serializer.ProtocolID(),
-            this.transportOptions,
-        );
+        this.webSocket = new WebSocket(endpoint, this.serializer.ProtocolID());
         this.callback = cb;
 
         if (IsBinarySerializer(this.serializer)) {
             this.webSocket.binaryType = 'arraybuffer';
         }
         this.webSocket.onopen = () => {
-            cb({
-                type: ETransportEventType.OPEN,
-            });
+            cb({  type: ETransportEventType.OPEN });
         };
 
         this.webSocket.onmessage = (ev) => {
             try {
-                const msg = (this.serializer.Deserialize as any)(ev.data);
-                cb({
-                    type: ETransportEventType.MESSAGE,
-                    message: msg,
-                });
-            } catch (err) {
-                cb({
-                    type: ETransportEventType.ERROR,
-                    error: err,
-                });
+                const message = (this.serializer.Deserialize as any)(ev.data);
+                cb({ type: ETransportEventType.MESSAGE, message });
+            } catch (error) {
+                cb({ type: ETransportEventType.ERROR, error });
             }
         };
         this.webSocket.onclose = (ev) => {
@@ -95,7 +72,6 @@ export abstract class WebSocketTransport implements ITransport {
         this.webSocket.close(code, reason);
         this.callback({
             type: ETransportEventType.CLOSE,
-
             code,
             reason,
             wasClean: true,
@@ -104,16 +80,15 @@ export abstract class WebSocketTransport implements ITransport {
         this.webSocket = null;
     }
 
-    public Send(msg: WampMessage): Promise<void> {
-        // console.log("===> SENDING MESSAGE:", msg);
+    public async Send(msg: WampMessage): Promise<void> {
         let payload;
         try {
             payload = this.serializer.Serialize(msg);
         } catch (err) {
             throw new SerializationError(err);
         }
-        return this.sendInternal(payload);
+        return this.webSocket!.send(payload);
     }
-
-    protected abstract sendInternal(payload: string | ArrayBuffer): Promise<void>;
 }
+
+export default WebSocketTransport;

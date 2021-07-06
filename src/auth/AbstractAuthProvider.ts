@@ -1,12 +1,7 @@
-import { IAuthProvider, Signature } from '../types/AuthProvider';
-import { WampDict } from '../types/messages/MessageTypes';
+import type { AuthProviderInterface, Signature } from '../types/AuthProvider';
+import type { WampDict } from '../types/messages/MessageTypes';
 
-/**
- * Helper class to configure transport level authentication.
- * This class should not be used directly as authentication provider.
- * @category auth
- */
-export class TransportLevelProvider implements IAuthProvider {
+abstract class AbstractAuthProvider implements AuthProviderInterface {
     /**
      * Creates a new instance.
      * @param authID The username to send to the server
@@ -35,3 +30,5 @@ export class TransportLevelProvider implements IAuthProvider {
         return this.authmethod;
     }
 }
+
+export default AbstractAuthProvider;

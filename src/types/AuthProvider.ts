@@ -25,7 +25,7 @@ export type Signature = {
  * For transport level authentication methods, ComputeChallenge won't be called.
  * @category auth
  */
-export interface IAuthProvider {
+export interface AuthProviderInterface {
     /**
      * Gets a value indicating whether the authentication is performed on the session or transport level.
      * @returns true if authentication is performed on the transport level, false for session level.
