@@ -1,5 +1,11 @@
 // Export basic types
-export { WampID, WampURI, WampDict, WampList, EMatchPolicy } from './types/messages/MessageTypes';
+export {
+    WampID,
+    WampURI,
+    WampDict,
+    WampList,
+    EMatchPolicy,
+} from './types/messages/MessageTypes';
 
 // Export public interfaces to interact with the library
 export * from './types/Serializer';

@@ -6,11 +6,11 @@ import { TransportLevelProvider } from './TransportProvider';
  * @category auth
  */
 export class AnonymousAuthProvider extends TransportLevelProvider {
-  /**
-   * Creates a new instance of the AnonymousAuthProvider.
-   * @param authid The username to authenticate as (default: `anonymous`)
-   */
-  constructor(authid?: string) {
-    super(authid || 'anonymous', 'anonymous');
-  }
+    /**
+     * Creates a new instance of the AnonymousAuthProvider.
+     * @param authid The username to authenticate as (default: `anonymous`)
+     */
+    constructor(authid?: string) {
+        super(authid || 'anonymous', 'anonymous');
+    }
 }

@@ -8,10 +8,10 @@ import { TransportLevelProvider } from './TransportProvider';
  * @category auth
  */
 export class CookieAuthProvider extends TransportLevelProvider {
-  /**
-   * Creates a new instance of the cookie auth provider.
-   */
-  constructor() {
-    super('', 'cookie');
-  }
+    /**
+     * Creates a new instance of the cookie auth provider.
+     */
+    constructor() {
+        super('', 'cookie');
+    }
 }

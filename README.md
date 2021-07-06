@@ -1,4 +1,4 @@
 # Landstrasse
 
 > Strongly typed (TypeScript) WAMP Client for browsers.  
-> *(Fork of __kraftfahrstrasse__)*
+> _(Fork of **kraftfahrstrasse**)_

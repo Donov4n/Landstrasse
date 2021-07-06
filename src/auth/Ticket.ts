@@ -21,31 +21,35 @@ export type GetTicketFunc = (authExtra: WampDict) => Promise<Signature>;
  * @category auth
  */
 export class TicketAuthProvider implements IAuthProvider {
-  /**
-   * Creates a new instance of the ticket provider.
-   * @param authid The username to send to the server.
-   * @param ticketFunc A callback used to retrieve the token/password.
-   * @param authmethod Name of the authmethod (default: 'ticket')
-   */
-  constructor(private authid: string, private ticketFunc: GetTicketFunc, private authmethod: string = 'ticket') { }
+    /**
+     * Creates a new instance of the ticket provider.
+     * @param authid The username to send to the server.
+     * @param ticketFunc A callback used to retrieve the token/password.
+     * @param authmethod Name of the authmethod (default: 'ticket')
+     */
+    constructor(
+        private authid: string,
+        private ticketFunc: GetTicketFunc,
+        private authmethod: string = 'ticket',
+    ) {}
 
-  /** @inheritDoc */
-  public AuthID(): string {
-    return this.authid;
-  }
+    /** @inheritDoc */
+    public AuthID(): string {
+        return this.authid;
+    }
 
-  /** @inheritDoc */
-  public AuthMethod(): string {
-    return this.authmethod;
-  }
+    /** @inheritDoc */
+    public AuthMethod(): string {
+        return this.authmethod;
+    }
 
-  /** @inheritDoc */
-  public ComputeChallenge(extra: WampDict): Promise<Signature> {
-    return this.ticketFunc(extra);
-  }
+    /** @inheritDoc */
+    public ComputeChallenge(extra: WampDict): Promise<Signature> {
+        return this.ticketFunc(extra);
+    }
 
-  /** @inheritDoc */
-  public IsTransportLevel(): boolean {
-    return false;
-  }
+    /** @inheritDoc */
+    public IsTransportLevel(): boolean {
+        return false;
+    }
 }
