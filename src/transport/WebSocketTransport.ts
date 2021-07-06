@@ -1,5 +1,3 @@
-import * as NodeWS from 'ws';
-
 import { WampDict } from '../types/messages/MessageTypes';
 import { WampMessage } from '../types/Protocol';
 import { IsBinarySerializer, ISerializer } from '../types/Serializer';
@@ -11,7 +9,7 @@ export interface IWebSocketFactory {
 }
 
 export abstract class WebSocketTransport implements ITransport {
-  protected webSocket: WebSocket | NodeWS | null = null;
+  protected webSocket: WebSocket | null = null;
   private callback: ((ev: TransportEvent) => void) | null = null;
 
   constructor(

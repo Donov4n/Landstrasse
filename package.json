@@ -1,62 +1,34 @@
 {
-  "name": "@verkehrsministerium/kraftfahrstrasse",
-  "version": "0.0.0-development",
-  "description": "WAMP implementation for TypeScript",
-  "main": "build/cjs/index.js",
-  "module": "build/module/index.js",
-  "types": "build/types/index.d.ts",
-  "private": false,
-  "sideEffects": false,
-  "files": [
-    "build"
-  ],
-  "scripts": {
-    "build": "npm run lint && npm run build:ts",
-    "build:ts": "tsc -p tsconfig.module.json && tsc -p tsconfig.cjs.json",
-    "build:docs": "typedoc --out docs --readme README.md --target esnext --theme default --mode file src --ignoreCompilerErrors",
-    "lint": "tslint -c tslint.json src/**/*.ts -p .",
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "example": "ts-node -r tsconfig-paths/register -P tsconfig.example.json example/$*",
-    "semantic-release": "semantic-release",
-    "prepack": "npm run build"
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/verkehrsministerium/kraftfahrstrasse.git"
-  },
-  "keywords": [
-    "wamp",
-    "autobahn",
-    "websocket"
-  ],
-  "author": {
-    "name": "Martin Koppehel",
-    "email": "mkoppehel@embedded.enterprises",
-    "url": "https://embedded.enterprises"
-  },
-  "contributors": [
-    "Johann Wagner",
-    "Fin Christensen",
-    "Marten Wallewein-Eising",
-    "Johannes Wünsche"
-  ],
-  "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/verkehrsministerium/kraftfahrstrasse/issues"
-  },
-  "homepage": "https://github.com/verkehrsministerium/kraftfahrstrasse#readme",
-  "dependencies": {
-    "@types/ws": "^7.4.4",
-    "msgpack5": "^5.3.2",
-    "ws": "^7.4.5"
-  },
-  "devDependencies": {
-    "@types/msgpack5": "^3.4.1",
-    "semantic-release": "^17.4.3",
-    "ts-node": "^9.1.1",
-    "tsconfig-paths": "^3.9.0",
-    "tslint": "^6.1.2",
-    "typedoc": "^0.20.36",
-    "typescript": "^4.2.4"
-  }
+    "name": "landstrasse",
+    "version": "0.1.0",
+    "description": "Strongly typed WAMP Client for browsers",
+    "homepage": "https://github.com/Donov4n/Landstrasse",
+    "license": "MIT",
+    "repository": "Donov4n/Landstrasse",
+    "keywords": [
+        "wamp",
+        "autobahn",
+        "websocket"
+    ],
+    "author": "Donovan Lambert <donovan@pulsanova.com>",
+    "contributors": [
+        "Martin Koppehel",
+        "Johann Wagner",
+        "Fin Christensen",
+        "Marten Wallewein-Eising",
+        "Johannes Wünsche"
+    ],
+    "main": "build/cjs/index.js",
+    "module": "build/module/index.js",
+    "types": "build/types/index.d.ts",
+    "sideEffects": false,
+    "files": [
+        "build"
+    ],
+    "scripts": {
+        "build": "tsc -p tsconfig.module.json && tsc -p tsconfig.cjs.json"
+    },
+    "devDependencies": {
+        "typescript": "^4.3.5"
+    }
 }

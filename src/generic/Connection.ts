@@ -201,7 +201,6 @@ export class Connection implements IConnection {
   private sendHello(): void {
     const details: HelloMessageDetails = {
       roles: Object.assign({}, ...this.subFactories.map(j => j.GetFeatures())),
-      agent: 'kraftfahrstrasse pre-alpha',
     };
 
     if (!!this.connectionOptions.authProvider) {

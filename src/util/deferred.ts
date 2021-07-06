@@ -13,8 +13,8 @@ export class Deferred<T> {
   public resolve(v: T) {
     this.resolveInternal!(v);
   }
+
   public reject(err?: any) {
     this.rejectInternal!(err);
   }
-
 }

@@ -1,13 +1,3 @@
-/*
- * kraftfahrstrasse - Public API
- * (c) 2018
- * Fin Christensen
- * Martin Koppehel
- * Johann Wagner
- * Marten Wallewein-Eising
- * Johannes Wünsche
- */
-
 // Export basic types
 export { WampID, WampURI, WampDict, WampList, EMatchPolicy } from './types/messages/MessageTypes';
 
@@ -21,12 +11,9 @@ export { WelcomeDetails } from './types/messages/WelcomeMessage';
 
 // Export different transports
 export { BrowserWebSocketTransport } from './transport/BrowserWebSocketTransport';
-export { NodeWebSocketTransport } from './transport/NodeWebSocketTransport';
 
 // Export different serializers
 export { JSONSerializer } from './serialize/JSON';
-export { BrowserMSGPackSerializer } from './serialize/BrowserMSGPack';
-export { NodeMSGPackSerializer } from './serialize/NodeMSGPack';
 
 // Export the different authentication providers
 export { TransportLevelProvider } from './auth/TransportProvider';

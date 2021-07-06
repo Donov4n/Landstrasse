@@ -1,7 +1,6 @@
 import { LogFunction, LogLevel } from '../types/Connection';
 
 class Logger {
-
   public fileName: string;
   public logFunction?: LogFunction;
 
@@ -12,22 +11,16 @@ class Logger {
     if (!this.logFunction) {
       this.log(LogLevel.WARNING, 'Fallback to internal log function. It is recommended to use an own log function.');
     }
-
   }
 
   public log(logLevel: LogLevel, logContent: any) {
-
     if (this.logFunction) {
       this.logFunction(logLevel, new Date(), this.fileName, logContent);
     } else {
       // tslint:disable-next-line:no-console
       console.log(`[${logLevel}][${new Date().toUTCString()}][${this.fileName}] ${logContent}`);
     }
-
   }
-
 }
 
-export {
-  Logger,
-};
+export { Logger };
