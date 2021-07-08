@@ -3,19 +3,19 @@ import { WampMessage } from '../types/Protocol';
 import type { TextSerializerInterface } from '../types/Serializer';
 
 class JSONSerializer implements TextSerializerInterface {
-    public IsBinary(): boolean {
+    public get isBinary(): boolean {
         return false;
     }
 
-    public ProtocolID(): string {
+    public get protocolId(): string {
         return 'wamp.2.json';
     }
 
-    public Serialize(msg: WampMessage): string {
+    public serialize(msg: WampMessage): string {
         return JSON.stringify(msg);
     }
 
-    public Deserialize(msg: string): WampMessage {
+    public unserialize(msg: string): WampMessage {
         return JSON.parse(msg);
     }
 }

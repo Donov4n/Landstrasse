@@ -1,4 +1,4 @@
-import { EWampMessageID, WampDict, WampID } from './MessageTypes';
+import type { EWampMessageID, WampDict, WampID } from './MessageTypes';
 
 export type WelcomeDetails = {
     roles: {

@@ -25,6 +25,12 @@ export enum EWampMessageID {
     YIELD = 70,
 }
 
+export enum EMatchPolicy {
+    Wildcard = 'wildcard',
+    Prefix = 'prefix',
+    Exact = '',
+}
+
 export type WampID = number;
 export type WampURI = string;
 export type WampDict = {
@@ -32,9 +38,3 @@ export type WampDict = {
 };
 
 export type WampList = any[];
-
-export enum EMatchPolicy {
-    Wildcard = 'wildcard',
-    Prefix = 'prefix',
-    Exact = '',
-}

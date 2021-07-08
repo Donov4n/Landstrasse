@@ -1,7 +1,8 @@
 export type LogFunction = (
-    logLevel: LogLevel,
+    level: LogLevel,
     timestamp: Date,
-    logText: string,
+    message: string,
+    details: any[]
 ) => void;
 
 export enum LogLevel {
@@ -21,15 +22,22 @@ class Logger {
         this.logFunction = logFunction;
     }
 
-    public log(logLevel: LogLevel, logContent: any) {
-        if (!this.debug && logLevel === LogLevel.DEBUG) {
+    public log(level: LogLevel, message: string, ...details: any) {
+        if (!this.debug && level === LogLevel.DEBUG) {
             return;
         }
 
         if (this.logFunction) {
-            this.logFunction(logLevel, new Date(), logContent);
+            this.logFunction(level, new Date(), message, details);
         } else {
-            console.log(`[${logLevel}] ${logContent}`);
+            const methodMap: Record<LogLevel, keyof Console> = {
+                [LogLevel.DEBUG]: 'debug',
+                [LogLevel.WARNING]: 'warn',
+                [LogLevel.ERROR]: 'error',
+                [LogLevel.INFO]: 'log',
+            };
+            const method = level in methodMap ? methodMap[level] : 'log';
+            console[method](message, ...details);
         }
     }
 }

@@ -1,4 +1,4 @@
-import { EWampMessageID, WampDict, WampID, WampURI } from './MessageTypes';
+import type { EWampMessageID, WampDict, WampID, WampURI } from './MessageTypes';
 
 export enum EWampMatchKind {
     EXACT = 'exact',

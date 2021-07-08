@@ -1,8 +1,10 @@
-import type { AuthProviderInterface, Signature } from '../types/AuthProvider';
+import AbstractAuthProvider from './AbstractAuthProvider';
+
+import type { Signature } from '../types/AuthProvider';
 import type { WampDict } from '../types/messages/MessageTypes';
 
 /**
- * GetTicketFunc describes a callback which is used to compute the
+ * TicketFunction describes a callback which is used to compute the
  * `challenge` (== password) for ticket based authentication.
  * We don't want to keep the password in persistent storage,
  * so we can't just store it at the instance level.
@@ -14,44 +16,36 @@ import type { WampDict } from '../types/messages/MessageTypes';
  *
  * @return A promise with the correct signature and, possibly details.
  */
-export type GetTicketFunc = (authExtra: WampDict) => Promise<Signature>;
+export type TicketFunction = (authExtra: WampDict) => Promise<Signature>;
 
 /**
  * Ticket authentication provider.
  *
  * This can be used to login with username and password or any other sort of static token.
  */
-export class TicketAuthProvider implements AuthProviderInterface {
+class TicketAuthProvider extends AbstractAuthProvider {
+    private ticketFunction: TicketFunction;
+
+    public get isTransportLevel(): boolean {
+        return false;
+    }
+
     /**
      * Creates a new instance of the ticket provider.
-     * @param authid The username to send to the server.
-     * @param ticketFunc A callback used to retrieve the token/password.
-     * @param authmethod Name of the authmethod (default: 'ticket')
+     *
+     * @param authId - The username to send to the server.
+     * @param ticketFunction - A callback used to retrieve the token/password.
+     * @param authMethod - Name of the authmethod (default: 'ticket').
      */
-    constructor(
-        private authid: string,
-        private ticketFunc: GetTicketFunc,
-        private authmethod: string = 'ticket',
-    ) {}
+    constructor(authId: string, ticketFunction: TicketFunction, authMethod: string = 'ticket') {
+        super(authId, authMethod);
 
-    /** @inheritDoc */
-    public AuthID(): string {
-        return this.authid;
+        this.ticketFunction = ticketFunction;
     }
 
     /** @inheritDoc */
-    public AuthMethod(): string {
-        return this.authmethod;
-    }
-
-    /** @inheritDoc */
-    public ComputeChallenge(extra: WampDict): Promise<Signature> {
-        return this.ticketFunc(extra);
-    }
-
-    /** @inheritDoc */
-    public IsTransportLevel(): boolean {
-        return false;
+    public computeChallenge(authExtra: WampDict): Promise<Signature> {
+        return this.ticketFunction(authExtra);
     }
 }
 

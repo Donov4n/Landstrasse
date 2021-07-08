@@ -7,6 +7,10 @@ import AbstractAuthProvider from './AbstractAuthProvider';
  * authenticated by the cookies it sent on the transport level.
  */
 class CookieAuthProvider extends AbstractAuthProvider {
+    public get isTransportLevel(): boolean {
+        return true;
+    }
+
     /**
      * Creates a new instance of the cookie auth provider.
      */

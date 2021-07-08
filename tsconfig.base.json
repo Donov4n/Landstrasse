@@ -1,9 +1,12 @@
 {
     "compilerOptions": {
+        "allowSyntheticDefaultImports": true,
+        "experimentalDecorators": true,
+        "useDefineForClassFields": true,
         "moduleResolution": "node",
+        "forceConsistentCasingInFileNames": true,
         "target": "es2015",
         "module": "commonjs",
-        "experimentalDecorators": true,
         "noImplicitAny": true,
         "lib": ["es2015", "dom"],
         "declaration": false,

@@ -1,16 +1,18 @@
 export type StateTransitionFunction<EState, TArgs> = (args: TArgs) => EState | null;
+export type TransitionMap<EState, TArgs> = Map<EState, StateTransitionFunction<EState, TArgs>>;
 
 class StateMachine<EState, TArgs> {
     private currentState: EState;
 
-    constructor(
-        initialState: EState,
-        private readonly transitionMap: Map<
-            EState,
-            StateTransitionFunction<EState, TArgs>
-        >,
-    ) {
+    private readonly transitionMap: TransitionMap<EState, TArgs>;
+
+    public get current(): EState {
+        return this.currentState;
+    }
+
+    constructor(initialState: EState, transitionMap: TransitionMap<EState, TArgs>) {
         this.currentState = initialState;
+        this.transitionMap = transitionMap;
     }
 
     public update(args: TArgs) {
@@ -18,12 +20,7 @@ class StateMachine<EState, TArgs> {
         if (!stateTransition) {
             return;
         }
-        const newState = stateTransition(args) || this.currentState;
-        this.currentState = newState;
-    }
-
-    public getState(): EState {
-        return this.currentState;
+        this.currentState = stateTransition(args) || this.currentState;
     }
 }
 

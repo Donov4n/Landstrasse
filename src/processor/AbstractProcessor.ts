@@ -1,47 +1,48 @@
 import Logger from '../util/logger';
 
-import type { IDGeneratorInterface } from '../util/id';
+import type { IdGeneratorInterface } from '../util/id';
 import type { WampDict } from '../types/messages/MessageTypes';
 import type { WampMessage } from '../types/Protocol';
 
 export type MessageSender = (msg: WampMessage) => Promise<void>;
 export type ProtocolViolator = (msg: string) => void;
-export type IDGen = {
-    global: IDGeneratorInterface;
-    session: IDGeneratorInterface;
+export type IdGenerators = {
+    global: IdGeneratorInterface;
+    session: IdGeneratorInterface;
 };
 
 export interface ProcessorInterface {
-    Close(): void;
-    ProcessMessage(msg: WampMessage): boolean;
+    processMessage(msg: WampMessage): boolean;
+    close(): void;
 }
 
 export interface ProcessorFactoryInterface {
     new (
         sender: MessageSender,
         violator: ProtocolViolator,
-        idGen: IDGen,
+        idGenerators: IdGenerators,
         logger: Logger,
     ): ProcessorInterface;
-    GetFeatures(): WampDict;
+
+    getFeatures(): WampDict;
 }
 
-abstract class AbstractProcessor {
+abstract class AbstractProcessor implements ProcessorInterface {
     protected closed = false;
 
     constructor(
         protected sender: MessageSender,
         protected violator: ProtocolViolator,
-        protected idGen: IDGen,
+        protected idGenerators: IdGenerators,
         protected logger: Logger,
     ) {}
 
-    public Close(): void {
+    public close(): void {
         this.closed = true;
         this.onClose();
     }
 
-    public ProcessMessage(msg: WampMessage): boolean {
+    public processMessage(msg: WampMessage): boolean {
         if (this.closed) {
             return false;
         }

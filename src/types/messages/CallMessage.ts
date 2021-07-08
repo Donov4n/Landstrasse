@@ -1,9 +1,16 @@
-import { EWampMessageID, WampDict, WampID, WampList, WampURI } from './MessageTypes';
+import type { EWampMessageID, WampDict, WampID, WampList, WampURI } from './MessageTypes';
 
 export enum ECallRunMode {
     PARTITION = 'partition',
     ALL = '',
 }
+
+export enum ECallKillMode {
+    SKIP = 'skip',
+    KILL = 'kill',
+    KILLNOWAIT = 'killnowait',
+}
+
 export type CallOptions = {
     receive_progress?: boolean;
     timeout?: number;
@@ -15,12 +22,6 @@ export type CallOptions = {
 export type CallResultOptions = {
     progress?: boolean;
 } & WampDict;
-
-export enum ECallKillMode {
-    SKIP = 'skip',
-    KILL = 'kill',
-    KILLNOWAIT = 'killnowait',
-}
 
 export type CancelOptions = {
     mode: ECallKillMode | '';

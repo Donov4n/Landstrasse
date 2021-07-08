@@ -1,7 +1,7 @@
 import StateMachine from '.';
 import { EWampMessageID } from '../types/messages/MessageTypes';
 
-import type { StateTransitionFunction } from '.';
+import type { TransitionMap } from '.';
 
 export enum EConnectionState {
     CLOSED = 'CLOSED',
@@ -20,15 +20,10 @@ export enum EMessageDirection {
 
 export type TConnectionArgs = [EMessageDirection, EWampMessageID];
 
-export class ConnectionStateMachine extends StateMachine<
-    EConnectionState,
-    [EMessageDirection, EWampMessageID]
-> {
+export class ConnectionStateMachine extends StateMachine<EConnectionState, [EMessageDirection, EWampMessageID]> {
     constructor() {
-        const transitions = new Map<
-            EConnectionState,
-            StateTransitionFunction<EConnectionState, TConnectionArgs>
-        >();
+        const transitions: TransitionMap<EConnectionState, TConnectionArgs> = new Map();
+
         transitions.set(EConnectionState.CLOSED, ([msgDir, msgId]) => {
             if (msgId === EWampMessageID.HELLO && msgDir === EMessageDirection.SENT) {
                 return EConnectionState.ETABLISHING;
@@ -37,15 +32,10 @@ export class ConnectionStateMachine extends StateMachine<
         });
 
         transitions.set(EConnectionState.ETABLISHING, ([msgDir, msgId]) => {
-            if (
-                msgId === EWampMessageID.WELCOME &&
-                msgDir === EMessageDirection.RECEIVED
-            ) {
+            if (msgId === EWampMessageID.WELCOME && msgDir === EMessageDirection.RECEIVED) {
                 return EConnectionState.ESTABLISHED;
-            } else if (
-                msgId === EWampMessageID.CHALLENGE &&
-                msgDir === EMessageDirection.RECEIVED
-            ) {
+            }
+            if (msgId === EWampMessageID.CHALLENGE && msgDir === EMessageDirection.RECEIVED) {
                 return EConnectionState.CHALLENGING;
             }
             return EConnectionState.ERROR;
@@ -66,20 +56,14 @@ export class ConnectionStateMachine extends StateMachine<
         });
 
         transitions.set(EConnectionState.CHALLENGING, ([msgDir, msgId]) => {
-            if (
-                msgId === EWampMessageID.AUTHENTICATE &&
-                msgDir === EMessageDirection.SENT
-            ) {
+            if (msgId === EWampMessageID.AUTHENTICATE && msgDir === EMessageDirection.SENT) {
                 return EConnectionState.AUTHENTICATING;
             }
             return EConnectionState.ERROR;
         });
 
         transitions.set(EConnectionState.AUTHENTICATING, ([msgDir, msgId]) => {
-            if (
-                msgId === EWampMessageID.WELCOME &&
-                msgDir === EMessageDirection.RECEIVED
-            ) {
+            if (msgId === EWampMessageID.WELCOME && msgDir === EMessageDirection.RECEIVED) {
                 return EConnectionState.ESTABLISHED;
             }
             return EConnectionState.ERROR;

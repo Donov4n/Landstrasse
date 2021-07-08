@@ -1,14 +1,14 @@
-import { WampHelloMessage } from './messages/HelloMessage';
-import { WampWelcomeMessage } from './messages/WelcomeMessage';
-import { WampPublishedMessage, WampPublishMessage } from './messages/PublishMessage';
-import {
+import type { WampHelloMessage } from './messages/HelloMessage';
+import type { WampWelcomeMessage } from './messages/WelcomeMessage';
+import type { WampPublishedMessage, WampPublishMessage } from './messages/PublishMessage';
+import type {
     EWampMessageID,
     WampDict,
     WampID,
     WampList,
     WampURI,
 } from './messages/MessageTypes';
-import {
+import type {
     WampCallMessage,
     WampCancelMessage,
     WampInterruptMessage,
@@ -16,14 +16,14 @@ import {
     WampResultMessage,
     WampYieldMessage,
 } from './messages/CallMessage';
-import {
+import type {
     WampEventMessage,
     WampSubscribedMessage,
     WampSubscribeMessage,
     WampUnsubscribedMessage,
     WampUnsubscribeMessage,
 } from './messages/SubscribeMessage';
-import {
+import type {
     WampRegisteredMessage,
     WampRegisterMessage,
     WampUnregisteredMessage,

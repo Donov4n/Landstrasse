@@ -14,16 +14,23 @@ class PendingMap<TSucMsg extends WampMessage> {
         private emptyRequest?: (msg: TSucMsg) => [boolean, string],
     ) {}
 
-    public Remove(pendingId: WampID, err?: any): void {
-        const p = this.pendings.get(pendingId);
-        if (!p) {
+    // public putAndResolve(id: WampID): Promise<TSucMsg> {
+    public add(id: WampID): Promise<TSucMsg> {
+        const deferred = new Deferred<TSucMsg>();
+        this.pendings.set(id, deferred);
+        return deferred.promise;
+    }
+
+    public reject(pendingId: WampID, err?: any): void {
+        const deferred = this.pendings.get(pendingId);
+        if (!deferred) {
             return;
         }
         this.pendings.delete(pendingId);
-        p.reject(err);
+        deferred.reject(err);
     }
 
-    public Close(): void {
+    public close(): void {
         this.closed = true;
         for (const pending of this.pendings) {
             pending[1].reject('closing');
@@ -31,43 +38,42 @@ class PendingMap<TSucMsg extends WampMessage> {
         this.pendings.clear();
     }
 
-    public PutAndResolve(id: WampID): Promise<TSucMsg> {
-        const deferred = new Deferred<TSucMsg>();
-        this.pendings.set(id, deferred);
-        return deferred.promise;
-    }
+    //
+    // - Handlers.
+    //
 
-    public Handle(msg: WampMessage): [boolean, boolean, string] {
+    public handle(msg: WampMessage): [boolean, boolean, string] {
         if (this.closed) {
             return [false, true, ''];
         }
+
         if (msg[0] === this.successMsg) {
-            const requestID = msg[1];
-            if (requestID === 0 && !!this.emptyRequest) {
+            const requestId = msg[1];
+            if (requestId === 0 && !!this.emptyRequest) {
                 const [success, error] = this.emptyRequest(msg as TSucMsg);
                 return [true, success, error];
             }
-            const pendingRequest = this.getAndDelete(requestID as WampID);
+
+            const pendingRequest = this.getAndDelete(requestId as WampID);
             if (!pendingRequest) {
-                return [true, false, 'unexpected ' + EWampMessageID[this.successMsg]];
+                return [true, false, `Unexpected ${EWampMessageID[this.successMsg]}.`];
             }
+
             pendingRequest.resolve(msg as TSucMsg);
             return [true, true, ''];
         }
 
         if (msg[0] === EWampMessageID.ERROR && msg[1] === this.initMsg) {
-            const requestID = msg[2];
-            const pendingRequest = this.getAndDelete(requestID);
+            const requestId = msg[2];
+            const pendingRequest = this.getAndDelete(requestId);
             if (!pendingRequest) {
-                return [
-                    true,
-                    false,
-                    'unexpected ' + EWampMessageID[this.initMsg] + ' ERROR',
-                ];
+                return [true, false, `Unexpected ${EWampMessageID[this.initMsg]} error.`];
             }
+
             pendingRequest.reject(msg[4]);
             return [true, true, ''];
         }
+
         return [false, true, ''];
     }
 

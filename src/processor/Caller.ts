@@ -3,7 +3,7 @@ import Deferred from '../util/deferred';
 import { LogLevel } from '../util/logger';
 import { EWampMessageID } from '../types/messages/MessageTypes';
 
-import type { CallResult } from '../types/Connection';
+import type { CallResult, CallReturn } from '../types/Connection';
 import type { WampMessage } from '../types/Protocol';
 import type { WampDict, WampID, WampList, WampURI } from '../types/messages/MessageTypes';
 import type {
@@ -13,8 +13,10 @@ import type {
     WampCancelMessage,
 } from '../types/messages/CallMessage';
 
+type CallRequest = Deferred<CallResult<WampList, WampDict>>;
+
 class Caller extends AbstractProcessor {
-    public static GetFeatures(): WampDict {
+    public static getFeatures(): WampDict {
         return {
             caller: {
                 features: {
@@ -28,141 +30,120 @@ class Caller extends AbstractProcessor {
         };
     }
 
-    private pendingCalls = new Map<
-        WampID,
-        [Deferred<CallResult<WampList, WampDict>>, boolean]
-    >();
+    private pendingCalls = new Map<WampID, [request: CallRequest, withProgress: boolean]>();
 
-    public Call<
-        A extends WampList,
-        K extends WampDict,
-        RA extends WampList,
-        RK extends WampDict,
-    >(
+    public call<A extends WampList, K extends WampDict, RA extends WampList, RK extends WampDict>(
         uri: WampURI,
         args?: A,
         kwArgs?: K,
         details?: CallOptions,
-    ): [Promise<CallResult<RA, RK>>, WampID] {
+    ): CallReturn<RA, RK> {
         if (this.closed) {
-            return [Promise.reject('caller closed'), -1];
+            return [
+                Promise.reject('Caller closed.'),
+                () => Promise.resolve(),
+            ];
         }
 
-        const requestID = this.idGen.session.ID();
-        details = details || {};
-        const msg: WampCallMessage = [
-            EWampMessageID.CALL,
-            requestID,
-            details,
-            uri,
-            args || [],
-            kwArgs || {},
-        ];
-        this.logger.log(LogLevel.DEBUG, `ID: ${requestID}, Calling ${uri}`);
-        const proc = !!details.receive_progress;
+        const withProgress = !!details?.receive_progress;
+        const requestId = this.idGenerators.session.id();
+        const message: WampCallMessage = [EWampMessageID.CALL, requestId, details || {}, uri, args || [], kwArgs || {}];
+        this.logger.log(LogLevel.DEBUG, `Calling "${uri}" (request id: ${requestId}).`, args, kwArgs, details);
 
-        const resultPromise = (async () => {
+        const executor = async () => {
             const result = new Deferred<CallResult<RA, RK>>();
-            this.pendingCalls.set(requestID, [
-                result as Deferred<CallResult<any, any>>,
-                proc,
-            ]);
+            this.pendingCalls.set(requestId, [result as Deferred<CallResult<any, any>>, withProgress]);
+
             try {
-                await this.sender(msg);
+                await this.sender(message);
             } catch (err) {
-                this.logger.log(LogLevel.WARNING, 'Call Failed ' + err);
-                this.pendingCalls.delete(requestID);
+                this.logger.log(LogLevel.WARNING, `Call to "${uri}" failed.`, err);
+                this.pendingCalls.delete(requestId);
                 throw err;
             }
+
             return await result.promise;
-        })();
-        return [resultPromise, requestID];
+        };
+
+        const cancel = (killMode?: ECallKillMode) => this.cancel(requestId, killMode);
+        return [executor(), cancel];
     }
 
-    public async CancelCall(callId: WampID, killMode?: ECallKillMode): Promise<void> {
-        // TODO: Check if call canceling supported by router
+    public async cancel(requestId: WampID, killMode?: ECallKillMode): Promise<void> {
         if (this.closed) {
-            throw new Error('caller closed');
+            throw new Error('Caller closed.');
         }
-        const call = this.pendingCalls.get(callId);
+
+        const call = this.pendingCalls.get(requestId);
         if (!call) {
-            throw new Error('no such pending call');
+            throw new Error('Unexpected cancellation (unable to find the related call).');
         }
-        const msg: WampCancelMessage = [
-            EWampMessageID.CANCEL,
-            callId,
-            { mode: killMode || '' },
-        ];
-        this.logger.log(LogLevel.DEBUG, `Cancelling Call ${callId}`);
+
+        const msg: WampCancelMessage = [EWampMessageID.CANCEL, requestId, { mode: killMode || '' }];
+        this.logger.log(LogLevel.DEBUG, `Cancelling call ${requestId}.`);
+
         await this.sender(msg);
     }
 
-    protected onClose(): void {
-        for (const call of this.pendingCalls) {
-            call[1][0].reject('caller closing');
-        }
-        this.pendingCalls.clear();
-    }
+    //
+    // - Handlers.
+    //
 
     protected onMessage(msg: WampMessage): boolean {
-        if (msg[0] === EWampMessageID.ERROR && msg[1] === EWampMessageID.CALL) {
-            const callid = msg[2];
-            this.logger.log(
-                LogLevel.WARNING,
-                `ID: ${callid}, Received Error for Call: ${msg[4]}`,
-            );
-
-            const call = this.pendingCalls.get(callid);
-            if (!call) {
-                this.violator('unexpected CALL ERROR');
-                return true;
-            }
-            this.pendingCalls.delete(callid);
-            call[0].reject(msg[4]);
-            return true;
-        }
         if (msg[0] === EWampMessageID.RESULT) {
-            const callid = msg[1];
-            const call = this.pendingCalls.get(callid);
-            if (!call) {
-                this.violator('unexpected RESULT');
+            const requestId = msg[1];
+            if (!this.pendingCalls.has(requestId)) {
+                this.violator('Unexpected result received (unable to find the related call).');
                 return true;
             }
-            const details = msg[2] || {};
-            const resargs = msg[3] || [];
-            const reskwargs = msg[4] || {};
-            if (details.progress) {
-                this.logger.log(
-                    LogLevel.DEBUG,
-                    `ID: ${callid}, Received Progress for Call`,
-                );
+            const [callRequest, awaitedProgress] = this.pendingCalls.get(requestId)!;
 
-                if (!call[1]) {
-                    this.violator('unexpected PROGRESS RESULT');
+            const details = msg[2] || {};
+            const resultArgs = msg[3] || [];
+            const resultKwargs = msg[4] || {};
+
+            if (details.progress) {
+                this.logger.log(LogLevel.DEBUG, `Received call progress for call ${requestId}.`, resultArgs, resultKwargs);
+
+                if (!awaitedProgress) {
+                    this.violator('Unexpected progress received for a call without progress requested.');
                     return true;
                 }
-                const nextResult = new Deferred<CallResult<WampList, WampDict>>();
-                this.pendingCalls.set(callid, [nextResult, true]);
-                call[0].resolve({
-                    args: resargs,
-                    kwArgs: reskwargs,
-                    nextResult: nextResult.promise,
-                });
+
+                const nextCallRequest = new Deferred<CallResult<WampList, WampDict>>();
+                callRequest.resolve({ args: resultArgs, kwArgs: resultKwargs, nextResult: nextCallRequest.promise });
+                this.pendingCalls.set(requestId, [nextCallRequest, true]);
             } else {
-                this.logger.log(
-                    LogLevel.DEBUG,
-                    `ID: ${callid}, Received Result for Call`,
-                );
-                this.pendingCalls.delete(callid);
-                call[0].resolve({
-                    args: resargs,
-                    kwArgs: reskwargs,
-                    nextResult: null,
-                });
+                this.logger.log(LogLevel.DEBUG, `Received result for call ${requestId}.`, resultArgs, resultKwargs);
+                callRequest.resolve({ args: resultArgs, kwArgs: resultKwargs, nextResult: null });
+                this.pendingCalls.delete(requestId);
             }
             return true;
         }
+
+        if (msg[0] === EWampMessageID.ERROR && msg[1] === EWampMessageID.CALL) {
+            const requestId = msg[2];
+            if (!this.pendingCalls.has(requestId)) {
+                this.violator('Unexpected call error received (unable to find the related call).');
+                return true;
+            }
+            const [callRequest] = this.pendingCalls.get(requestId)!;
+
+            this.logger.log(LogLevel.WARNING, `Received error for call ${requestId}.`, msg[4]);
+            this.pendingCalls.delete(requestId);
+            callRequest.reject(msg[4]);
+
+            return true;
+        }
+
         return false;
+    }
+
+    protected onClose(): void {
+        this.pendingCalls.forEach(([request]) => {
+            request.reject('Caller closing.');
+        });
+        this.pendingCalls.clear();
     }
 }
 

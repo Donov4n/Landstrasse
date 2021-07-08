@@ -1,4 +1,4 @@
-import { EWampMessageID, WampURI } from './MessageTypes';
+import type { EWampMessageID, WampURI } from './MessageTypes';
 
 export type HelloMessageDetails = {
     roles: {
