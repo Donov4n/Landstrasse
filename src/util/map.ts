@@ -14,7 +14,6 @@ class PendingMap<TSucMsg extends WampMessage> {
         private emptyRequest?: (msg: TSucMsg) => [boolean, string],
     ) {}
 
-    // public putAndResolve(id: WampID): Promise<TSucMsg> {
     public add(id: WampID): Promise<TSucMsg> {
         const deferred = new Deferred<TSucMsg>();
         this.pendings.set(id, deferred);
