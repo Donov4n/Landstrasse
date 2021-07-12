@@ -261,7 +261,7 @@ class Connection {
                 if (msg[0] !== EWampMessageID.ABORT) {
                     this.handleProtocolViolation('Protocol violation during session creation.');
                 } else {
-                    this._transport.close(3000, msg[2]);
+                    this._transport.close(3000, msg[2], true);
                     this.handleOnOpen(new ConnectionOpenError(msg[2], msg[1]));
                 }
                 break;
@@ -325,6 +325,7 @@ class Connection {
             case ETransportEventType.ERROR: {
                 this._logger.log(LogLevel.DEBUG, 'Connection error.', event.error);
                 if (this._state.current !== EConnectionState.ESTABLISHED) {
+                    this._transport!.close(3000, 'connection_error', true);
                     this.handleOnOpen(new ConnectionOpenError(event.error));
                 }
                 break;
@@ -339,12 +340,14 @@ class Connection {
                     this._processors = null;
                 }
 
-                if (!this.handleOnOpen(new ConnectionOpenError(event.reason))) {
-                    this.handleOnClose(
-                        event.wasClean
-                            ? { code: event.code, reason: event.reason, wasClean: event.wasClean }
-                            : new ConnectionCloseError(event.reason, event.code),
-                    );
+                if (!event.silent) {
+                    if (!this.handleOnOpen(new ConnectionOpenError(event.reason))) {
+                        this.handleOnClose(
+                            event.wasClean
+                                ? { code: event.code, reason: event.reason, wasClean: event.wasClean }
+                                : new ConnectionCloseError(event.reason, event.code),
+                        );
+                    }
                 }
                 break;
             }
@@ -365,7 +368,7 @@ class Connection {
 
         this._logger.log(LogLevel.ERROR, `Protocol violation: ${reason}.`);
         this._transport.send(abortMessage);
-        this._transport.close(3000, 'protcol_violation');
+        this._transport.close(3000, 'protcol_violation', true);
         this.handleOnOpen(new ConnectionOpenError('Protocol violation.'));
     }
 

@@ -15,11 +15,12 @@ export type TransportEvent =
           type: ETransportEventType.CLOSE,
           code: number,
           reason: string,
+          silent: boolean,
           wasClean: boolean,
       };
 
 export interface TransportInterface {
     open(endpoint: string, callback: (ev: TransportEvent) => void): void;
-    close(code: number, reason: string): void;
+    close(code: number, reason: string, silent?: boolean): void;
     send(message: WampMessage): Promise<void>;
 }
