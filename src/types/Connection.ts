@@ -16,7 +16,7 @@ export {
 };
 
 import type { SerializerInterface } from './Serializer';
-import type { WampDict, WampID, WampList } from './messages/MessageTypes';
+import type { WampDict, WampList } from './messages/MessageTypes';
 import type { AuthProviderInterface } from './AuthProvider';
 import type { LogFunction } from '../util/logger';
 
