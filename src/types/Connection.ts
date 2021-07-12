@@ -40,7 +40,7 @@ export type OptionsBase = {
 
     // - Handlers
     onOpen?: (details: WelcomeDetails) => void,
-    onClose?: (infos: ConnectionCloseInfo) => undefined | boolean,
+    onClose?: (infos: ConnectionCloseInfo) => void | boolean,
 
     // - Retry options
     retryIfUnreachable?: boolean,

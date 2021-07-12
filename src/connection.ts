@@ -372,7 +372,6 @@ class Connection {
     private handleTransportEvent(event: TransportEvent): void {
         switch (event.type) {
             case ETransportEventType.OPEN: {
-                this._logger.log(LogLevel.DEBUG, 'Connection opened.');
                 this.sendHello();
                 break;
             }
@@ -393,8 +392,6 @@ class Connection {
                 break;
             }
             case ETransportEventType.CLOSE: {
-                this._logger.log(LogLevel.DEBUG, 'Connection closed.', event);
-
                 this._transport = null;
                 this._state = new ConnectionStateMachine();
                 if (this._processors) {
@@ -448,6 +445,7 @@ class Connection {
             return true;
         }
 
+        this._logger.log(LogLevel.WARNING, 'Connection failed.', details);
         if (this.retryOpening()) {
             return true;
         }
@@ -460,6 +458,7 @@ class Connection {
     private handleOnClose(event: ConnectionCloseInfo): void {
         this.resetRetryTimer();
 
+        this._logger.log(LogLevel[event.wasClean ? 'DEBUG' : 'WARNING'], 'Connection closed.', event);
         const stopReconnecting = !!this._options.onClose?.(event);
         if (!stopReconnecting && this.retryOpening()) {
             return;
@@ -519,7 +518,7 @@ class Connection {
 
         this._isRetrying = true;
         this._retryTimer = setTimeout(retry, nextTry.delay * 1000);
-        this._logger.log(LogLevel.INFO, `Trying to reconnect [${nextTry.count}] in ${nextTry.delay}s ...`);
+        this._logger.log(LogLevel.INFO, `Will try to reconnect [${nextTry.count}] in ${nextTry.delay}s ...`);
         return true;
     }
 
