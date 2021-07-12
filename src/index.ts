@@ -14,7 +14,6 @@ export * from './types/Connection';
 // - Export errors
 export { default as WampError } from './error/WampError';
 export { default as ConnectionOpenError } from './error/ConnectionOpenError';
-export { default as ConnectionCloseError } from './error/ConnectionCloseError';
 
 // - Export the different authentication providers
 export { default as AbstractAuthProvider } from './auth/AbstractAuthProvider';

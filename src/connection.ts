@@ -3,10 +3,10 @@ import JSONSerializer from './serializer/json';
 import Deferred from './util/deferred';
 import Logger, { LogLevel } from './util/logger';
 import ConnectionOpenError from './error/ConnectionOpenError';
-import ConnectionCloseError from './error/ConnectionCloseError';
 import { ETransportEventType } from './types/Transport';
 import { GlobalIDGenerator, SessionIDGenerator } from './util/id';
 import { EWampMessageID } from './types/messages/MessageTypes';
+import { normalRand } from './util';
 import {
     ConnectionStateMachine,
     EConnectionState,
@@ -34,6 +34,10 @@ import type { SerializerInterface } from './types/Serializer';
 import type { WampDict, WampList, WampURI, } from './types/messages/MessageTypes';
 import type { CallHandler, CallReturn, ConnectionCloseInfo, Options, EventHandler } from './types/Connection';
 
+type RetryInfos =
+    | { count: null, delay: null, willRetry: false }
+    | { count: number, delay: number, willRetry: true };
+
 const createIdGenerators = (): IdGenerators => ({
     global: new GlobalIDGenerator(),
     session: new SessionIDGenerator(),
@@ -42,7 +46,11 @@ const createIdGenerators = (): IdGenerators => ({
 class Connection {
     private readonly _options: Options;
 
-    protected _sessionId: number | null = null;
+    private readonly _endpoint: string;
+
+    private readonly _realm: string;
+
+    private _sessionId: number | null = null;
 
     private _transport: TransportInterface | null = null;
 
@@ -56,9 +64,33 @@ class Connection {
     private _serializer: SerializerInterface;
 
     private _openedDeferred: Deferred<WelcomeDetails> | null = null;
-    private _closedDeferred: Deferred<ConnectionCloseInfo> | null = null;
+    private _closedDeferred: Deferred | null = null;
+
+    private _isRetrying: boolean = false;
+
+    private _shouldRetry: boolean = false;
+
+    private _retryTimer: number | null = null;
+
+    private _maxRetries: number;
+
+    private _retryCount: number = 0;
+
+    private _retryDelayInitial: number;
+
+    private _retryDelay: number;
+
+    private _retryDelayMax: number;
 
     private readonly _logger: Logger;
+
+    public get endpoint(): string {
+        return this._endpoint;
+    }
+
+    public get realm(): string {
+        return this._realm;
+    }
 
     public get sessionId(): number | null {
         return this._sessionId;
@@ -68,16 +100,16 @@ class Connection {
         return this._isRetrying;
     }
 
-    public get closed(): Promise<ConnectionCloseInfo> {
-        if (!this._closedDeferred) {
-            this._closedDeferred = new Deferred();
-        }
-        return this._closedDeferred.promise;
-    }
+    constructor(endpoint: string, realm: string, options: Options) {
+        this._endpoint = endpoint;
+        this._realm = realm;
+        this._options = { retryIfUnreachable: true, ...options };
 
-    constructor(options: Options) {
-        this._options = options;
         this._serializer = this._options?.serializer ?? new JSONSerializer();
+        this._maxRetries = this._options?.maxRetries ?? -1;
+        this._retryDelayInitial = this._options?.initialRetryDelay ?? 3;
+        this._retryDelayMax = this._options?.maxRetryDelay ?? 60;
+        this._retryDelay = this._retryDelayInitial;
 
         this._state = new ConnectionStateMachine();
         this._idGenerators = createIdGenerators();
@@ -90,33 +122,51 @@ class Connection {
             return Promise.reject('Transport already opened or opening.');
         }
 
-        this._logger.log(LogLevel.DEBUG, 'Opening Connection.');
-        this._transport = new WebSocketTransport(this._serializer);
-        this._state = new ConnectionStateMachine();
+        if (this._openedDeferred) {
+            return this._openedDeferred.promise;
+        }
         this._openedDeferred = new Deferred();
-        this._transport.open(
-            this._options.endpoint,
-            this.handleTransportEvent.bind(this),
-        );
+
+        this.resetRetry();
+        this._shouldRetry = true;
+
+        this._logger.log(LogLevel.DEBUG, 'Opening Connection.');
+        this._open();
 
         return this._openedDeferred.promise;
     }
 
-    public close(): Promise<ConnectionCloseInfo> {
-        if (!this._transport) {
+    public close(): Promise<void> {
+        if (!this._transport && !this.isRetrying) {
             return Promise.reject('Connection already closed.');
         }
 
-        this._transport.send([
-            EWampMessageID.GOODBYE,
-            { message: 'client shutdown' },
-            'wamp.close.normal',
-        ]);
+        if (this._closedDeferred) {
+            return this._closedDeferred.promise;
+        }
+        this._closedDeferred = new Deferred();
 
-        this._logger.log(LogLevel.DEBUG, 'Closing Connection.');
-        this._state.update([EMessageDirection.SENT, EWampMessageID.GOODBYE]);
+        // - The app wants to close .. don't retry.
+        this._shouldRetry = false;
 
-        return this.closed;
+        if (this._transport) {
+            this._transport.send([
+                EWampMessageID.GOODBYE,
+                { message: 'client shutdown' },
+                'wamp.close.normal',
+            ]);
+
+            this._logger.log(LogLevel.DEBUG, 'Closing Connection.');
+            this._state.update([EMessageDirection.SENT, EWampMessageID.GOODBYE]);
+        } else {
+            this.handleOnClose({
+                code: -1,
+                reason: 'Closed before retry.',
+                wasClean: true,
+            });
+        }
+
+        return this._closedDeferred.promise;
     }
 
     //
@@ -308,7 +358,7 @@ class Connection {
              }
         }
 
-        const message: WampHelloMessage = [EWampMessageID.HELLO, this._options.realm, details];
+        const message: WampHelloMessage = [EWampMessageID.HELLO, this.realm, details];
         this._transport!.send(message).then(
             () => { this._state.update([EMessageDirection.SENT, EWampMessageID.HELLO]); },
             (err) => { this.handleProtocolViolation(`Transport error: ${err}.`); },
@@ -354,11 +404,11 @@ class Connection {
 
                 if (!event.silent) {
                     if (!this.handleOnOpen(new ConnectionOpenError(event.reason))) {
-                        this.handleOnClose(
-                            event.wasClean
-                                ? { code: event.code, reason: event.reason, wasClean: event.wasClean }
-                                : new ConnectionCloseError(event.reason, event.code),
-                        );
+                        this.handleOnClose({
+                            code: event.code,
+                            reason: event.reason,
+                            wasClean: event.wasClean
+                        });
                     }
                 }
                 break;
@@ -388,28 +438,123 @@ class Connection {
         if (!this._openedDeferred) {
             return false;
         }
+        this.resetRetryTimer();
 
-        if (details instanceof Error) {
-            this._openedDeferred.reject(details);
-        } else {
+        if (!(details instanceof Error)) {
+            this.resetRetry();
+            this._options.onOpen?.(details);
             this._openedDeferred.resolve(details);
+            this._openedDeferred = null;
+            return true;
         }
-        this._openedDeferred = null;
 
+        if (this.retryOpening()) {
+            return true;
+        }
+
+        this._openedDeferred.reject(details);
+        this._openedDeferred = null;
         return true;
     }
 
-    private handleOnClose(details: Error | ConnectionCloseInfo): void {
-        if (!this._closedDeferred) {
+    private handleOnClose(event: ConnectionCloseInfo): void {
+        this.resetRetryTimer();
+
+        const stopReconnecting = !!this._options.onClose?.(event);
+        if (!stopReconnecting && this.retryOpening()) {
             return;
         }
 
-        if (details instanceof Error) {
-            this._closedDeferred.reject(details);
-        } else {
-            this._closedDeferred.resolve(details);
+        if (this._closedDeferred) {
+            this._closedDeferred.resolve();
+            this._closedDeferred = null;
         }
-        this._closedDeferred = null;
+    }
+
+    //
+    // - Internal
+    //
+
+    private _open(): void {
+        if (this._transport) {
+            return;
+        }
+
+        if (!this._openedDeferred) {
+            this._openedDeferred = new Deferred();
+        }
+
+        this._state = new ConnectionStateMachine();
+        this._transport = new WebSocketTransport(this._serializer);
+        this._transport.open(
+            this.endpoint,
+            this.handleTransportEvent.bind(this),
+        );
+    }
+
+    private retryOpening(): boolean {
+        if (!this._shouldRetry) {
+            return false;
+        }
+
+        // - Closed while connecting.
+        const isConnecting = !!this._openedDeferred;
+        if (isConnecting && !this._options.retryIfUnreachable) {
+            this._logger.log(LogLevel.WARNING, 'Auto-reconnect disabled!');
+            return false;
+        }
+
+        const nextTry = this.nextTryInfos();
+        if (!nextTry.willRetry) {
+            this._logger.log(LogLevel.WARNING, 'Giving up trying to reconnect!');
+            return false;
+        }
+
+        const retry = () => {
+            if (!this._shouldRetry) {
+                return;
+            }
+            this._open();
+        };
+
+        this._isRetrying = true;
+        this._retryTimer = setTimeout(retry, nextTry.delay * 1000);
+        this._logger.log(LogLevel.INFO, `Trying to reconnect [${nextTry.count}] in ${nextTry.delay}s ...`);
+        return true;
+    }
+
+    private resetRetryTimer() {
+        if (this._retryTimer) {
+            clearTimeout(this._retryTimer);
+        }
+        this._retryTimer = null;
+    }
+
+    private resetRetry() {
+        this.resetRetryTimer();
+
+        this._retryCount = 0;
+        this._retryDelay = this._retryDelayInitial;
+        this._isRetrying = false;
+    }
+
+    private nextTryInfos(): RetryInfos {
+        this._retryDelay = normalRand(this._retryDelay, this._retryDelay * 0.1);
+        if (this._retryDelay > this._retryDelayMax) {
+            this._retryDelay = this._retryDelayMax;
+        }
+
+        this._retryCount += 1;
+
+        let infos: RetryInfos = { count: null, delay: null, willRetry: false };
+        if (this._shouldRetry && (this._maxRetries === -1 || this._retryCount <= this._maxRetries)) {
+            infos = { count: this._retryCount, delay: this._retryDelay, willRetry: true };
+        }
+
+        // - Retry delay growth for next retry cycle.
+        this._retryDelay = this._retryDelay * 1.5;
+
+        return infos;
     }
 }
 

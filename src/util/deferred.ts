@@ -1,4 +1,4 @@
-class Deferred<T> {
+class Deferred<T = void> {
     public promise: Promise<T>;
     private resolveInternal?: (v: T) => void;
     private rejectInternal?: (reason?: any) => void;

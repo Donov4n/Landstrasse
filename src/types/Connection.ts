@@ -4,6 +4,7 @@ import type { CallOptions, InvocationDetails } from './messages/CallMessage';
 import type { PublishOptions } from './messages/PublishMessage';
 import type { RegisterOptions } from './messages/RegisterMessage';
 import type { EventDetails, SubscribeOptions } from './messages/SubscribeMessage';
+import type { WelcomeDetails } from './messages/WelcomeMessage';
 
 export {
     CallOptions,
@@ -34,10 +35,18 @@ export type InlineAuth = {
 
 export type OptionsBase = {
     debug?: boolean,
-    endpoint: string,
-    realm: string,
     serializer?: SerializerInterface,
     logFunction?: LogFunction,
+
+    // - Handlers
+    onOpen?: (details: WelcomeDetails) => void,
+    onClose?: (infos: ConnectionCloseInfo) => undefined | boolean,
+
+    // - Retry options
+    retryIfUnreachable?: boolean,
+    maxRetries?: number,
+    initialRetryDelay?: number,
+    maxRetryDelay?: number,
 };
 
 export type Options = OptionsBase & (
