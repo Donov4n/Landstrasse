@@ -30,10 +30,9 @@ import type { WampWelcomeMessage, WelcomeDetails } from './types/messages/Welcom
 import type { IdGenerators, ProcessorFactoryInterface } from './processor/AbstractProcessor';
 import type { TransportInterface, TransportEvent } from './types/Transport';
 import type { SubscribeOptions } from './types/messages/SubscribeMessage';
-import type { AuthProviderInterface } from './types/AuthProvider';
 import type { SerializerInterface } from './types/Serializer';
 import type { WampDict, WampList, WampURI, } from './types/messages/MessageTypes';
-import type { CallHandler, CallReturn, ConnectionCloseInfo, ConnectionOptions, EventHandler } from './types/Connection';
+import type { CallHandler, CallReturn, ConnectionCloseInfo, Options, EventHandler } from './types/Connection';
 
 const createIdGenerators = (): IdGenerators => ({
     global: new GlobalIDGenerator(),
@@ -41,7 +40,7 @@ const createIdGenerators = (): IdGenerators => ({
 });
 
 class Connection {
-    private readonly _options: ConnectionOptions;
+    private readonly _options: Options;
 
     protected _sessionId: number | null = null;
 
@@ -55,7 +54,6 @@ class Connection {
     private _state: ConnectionStateMachine;
 
     private _serializer: SerializerInterface;
-    private _authProvider: AuthProviderInterface | null;
 
     private _openedDeferred: Deferred<WelcomeDetails> | null = null;
     private _closedDeferred: Deferred<ConnectionCloseInfo> | null = null;
@@ -77,10 +75,9 @@ class Connection {
         return this._closedDeferred.promise;
     }
 
-    constructor(options: ConnectionOptions) {
+    constructor(options: Options) {
         this._options = options;
         this._serializer = this._options?.serializer ?? new JSONSerializer();
-        this._authProvider = this._options?.authProvider ?? null;
 
         this._state = new ConnectionStateMachine();
         this._idGenerators = createIdGenerators();
@@ -189,13 +186,13 @@ class Connection {
             case EConnectionState.CHALLENGING: {
                 const challengeMsg = msg as WampChallengeMessage;
 
-                if (!this._authProvider) {
+                if (!('authProvider' in this._options) || !this._options.authProvider) {
                     this._logger.log(LogLevel.ERROR, 'Received WAMP challenge, but no auth provider set.');
                     this._transport.close(3000, 'Authentication failed.');
                     return;
                 }
 
-                this._authProvider
+                this._options.authProvider
                     .computeChallenge(challengeMsg[2] || {})
                     .then((signature) => {
                         if (!this._transport) {
@@ -292,9 +289,23 @@ class Connection {
             )),
         };
 
-        if (this._authProvider) {
-            details.authid = this._authProvider.authId;
-            details.authmethods = [this._authProvider.authMethod];
+        if ('authProvider' in this._options && this._options.authProvider) {
+            details.authid = this._options.authProvider.authId;
+            details.authmethods = [this._options.authProvider.authMethod];
+        }
+
+        if ('auth' in this._options && this._options.auth) {
+            if (this._options.auth.id) {
+                details.authid = this._options.auth.id;
+            }
+
+            if (this._options.auth.method) {
+                details.authmethods = [this._options.auth.method];
+            }
+
+            if (this._options.auth.extra) {
+                details.authextra = this._options.auth.extra;
+             }
         }
 
         const message: WampHelloMessage = [EWampMessageID.HELLO, this._options.realm, details];

@@ -10,6 +10,7 @@ export type HelloMessageDetails = {
     agent?: string;
     authmethods?: string[];
     authid?: string;
+    authextra?: Record<string, any>,
 };
 
 export type WampHelloMessage = [EWampMessageID.HELLO, WampURI, HelloMessageDetails];

@@ -26,14 +26,24 @@ export type ConnectionCloseInfo = {
     wasClean: boolean;
 };
 
-export type ConnectionOptions = {
-    debug?: boolean,
-    endpoint: string;
-    realm: string;
-    serializer?: SerializerInterface;
-    authProvider?: AuthProviderInterface;
-    logFunction?: LogFunction;
+export type InlineAuth = {
+    id?: string,
+    method?: string,
+    extra?: Record<string, any>,
 };
+
+export type OptionsBase = {
+    debug?: boolean,
+    endpoint: string,
+    realm: string,
+    serializer?: SerializerInterface,
+    logFunction?: LogFunction,
+};
+
+export type Options = OptionsBase & (
+    | { auth?: InlineAuth }
+    | { authProvider?: AuthProviderInterface }
+);
 
 export type CallResult<TArgs extends WampList, TKwArgs extends WampDict> = {
     args: TArgs;
