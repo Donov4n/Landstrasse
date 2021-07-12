@@ -90,6 +90,7 @@ class Connection {
             return Promise.reject('Transport already opened or opening.');
         }
 
+        this._logger.log(LogLevel.DEBUG, 'Opening Connection.');
         this._transport = new WebSocketTransport(this._serializer);
         this._state = new ConnectionStateMachine();
         this._openedDeferred = new Deferred();
@@ -98,7 +99,6 @@ class Connection {
             this.handleTransportEvent.bind(this),
         );
 
-        this._logger.log(LogLevel.DEBUG, 'Connection opened.');
         return this._openedDeferred.promise;
     }
 
@@ -322,6 +322,7 @@ class Connection {
     private handleTransportEvent(event: TransportEvent): void {
         switch (event.type) {
             case ETransportEventType.OPEN: {
+                this._logger.log(LogLevel.DEBUG, 'Connection opened.');
                 this.sendHello();
                 break;
             }
