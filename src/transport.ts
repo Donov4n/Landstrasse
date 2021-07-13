@@ -42,7 +42,7 @@ class WebSocketTransport implements TransportInterface {
             }
         };
 
-        this.webSocket.onclose = (ev) => {
+        this.webSocket.onclose = (ev: CloseEvent) => {
             this.webSocket!.onclose = null;
             this.webSocket!.onerror = null;
             this.callback = null;
@@ -52,6 +52,7 @@ class WebSocketTransport implements TransportInterface {
                 type: ETransportEventType.CLOSE,
                 code: ev.code,
                 reason: ev.reason,
+                message: 'Received close event.',
                 silent: false,
                 wasClean: ev.wasClean,
             });
@@ -70,7 +71,7 @@ class WebSocketTransport implements TransportInterface {
         };
     }
 
-    public close(code: number, reason: string, silent: boolean = false): void {
+    public close(code: number, reason: string, message: string = '', silent: boolean = false): void {
         if (!this.webSocket || !this.callback) {
             return;
         }
@@ -83,6 +84,7 @@ class WebSocketTransport implements TransportInterface {
             type: ETransportEventType.CLOSE,
             code,
             reason,
+            message,
             silent,
             wasClean: true,
         });

@@ -26,13 +26,18 @@ import type { CallOptions } from './types/messages/CallMessage';
 import type { HelloMessageDetails, WampHelloMessage } from './types/messages/HelloMessage';
 import type { PublishOptions } from './types/messages/PublishMessage';
 import type { RegisterOptions } from './types/messages/RegisterMessage';
-import type { WampAbortMessage, WampChallengeMessage, WampMessage } from './types/Protocol';
 import type { WampWelcomeMessage, WelcomeDetails } from './types/messages/WelcomeMessage';
 import type { IdGenerators, ProcessorFactoryInterface } from './processor/AbstractProcessor';
 import type { TransportInterface, TransportEvent } from './types/Transport';
 import type { SubscribeOptions } from './types/messages/SubscribeMessage';
 import type { SerializerInterface } from './types/Serializer';
 import type { WampDict, WampList, WampURI, } from './types/messages/MessageTypes';
+import type {
+    WampGoodbyeMessage,
+    WampAbortMessage,
+    WampChallengeMessage,
+    WampMessage,
+} from './types/Protocol';
 import type {
     Options,
     CallHandler,
@@ -175,8 +180,8 @@ class Connection {
             this._state.update([EMessageDirection.SENT, EWampMessageID.GOODBYE]);
         } else {
             this.handleClose({
-                code: -1,
-                reason: 'Closed before retry.',
+                reason: 'wamp.close.normal',
+                message: 'Client shutdown (between two retries).',
                 wasClean: true,
             });
         }
@@ -253,7 +258,7 @@ class Connection {
 
                 if (!('authProvider' in this._options) || !this._options.authProvider) {
                     this._logger.log(LogLevel.ERROR, 'Received WAMP challenge, but no auth provider set.');
-                    this._transport.close(3000, 'Authentication failed.');
+                    this._transport.close(3000, 'auth_error', 'Received WAMP challenge, but no auth provider set.');
                     return;
                 }
 
@@ -280,7 +285,7 @@ class Connection {
                             return;
                         }
                         this._logger.log(LogLevel.WARNING, 'Failed to compute challenge.', error);
-                        this._transport.close(3000, 'Authentication failed.');
+                        this._transport.close(3000, 'auth_challenge_failed', 'Failed to compute challenge.');
                     });
                 break;
             }
@@ -309,12 +314,13 @@ class Connection {
                     'wamp.close.goodbye_and_out',
                 ]);
                 this._state.update([EMessageDirection.SENT, EWampMessageID.GOODBYE]);
-                this._transport.close(1000, 'wamp.close.normal');
+                this._transport.close(1000, 'wamp.close.normal', (msg as WampGoodbyeMessage)[1]?.message);
                 break;
             }
             case EConnectionState.CLOSED: {
                 // - Clean close finished, actually close the transport, so `closed` and close callbacks will be created.
-                this._transport.close(1000, 'wamp.close.normal');
+                const message = msg[0] === EWampMessageID.GOODBYE ? msg[1]?.message : undefined;
+                this._transport.close(1000, 'wamp.close.normal', message);
                 break;
             }
             case EConnectionState.ERROR: {
@@ -323,8 +329,9 @@ class Connection {
                 if (msg[0] !== EWampMessageID.ABORT) {
                     this.handleProtocolViolation('Protocol violation during session creation.');
                 } else {
-                    this._transport.close(3000, msg[2], true);
-                    this.handleOpen(new ConnectionOpenError(msg[2], msg[1]));
+                    const { message } = msg[1] ?? {};
+                    this._transport.close(3000, msg[2], message, true);
+                    this.handleOpen(new ConnectionOpenError(msg[2], message));
                 }
                 break;
             }
@@ -402,16 +409,16 @@ class Connection {
             case ETransportEventType.ERROR: {
                 if (event.type === ETransportEventType.CRITICAL_ERROR || this.isConnecting) {
                     if (this._transport!.isOpen) {
-                        this._transport!.close(3000, 'connection_error', true);
+                        this._transport!.close(3000, 'connection_error', event.error, true);
                     } else {
                         this.resetConnectionInfos();
                     }
 
-                    if (!this.handleOpen(new ConnectionOpenError(event.error))) {
+                    if (!this.handleOpen(new ConnectionOpenError('connection_error', event.error))) {
                         this.handleClose({
-                            reason: 'Transport error.',
+                            reason: 'connection_error',
                             message: event.error,
-                            wasClean: false
+                            wasClean: false,
                         });
                     }
                 } else {
@@ -423,11 +430,12 @@ class Connection {
                 this.resetConnectionInfos();
 
                 if (!event.silent) {
-                    if (!this.handleOpen(new ConnectionOpenError(event.reason))) {
+                    if (!this.handleOpen(new ConnectionOpenError(event.reason, event.message))) {
                         this.handleClose({
                             code: event.code,
                             reason: event.reason,
-                            wasClean: event.wasClean
+                            message: event.message,
+                            wasClean: event.wasClean,
                         });
                     }
                 }
@@ -436,7 +444,7 @@ class Connection {
         }
     }
 
-    private handleProtocolViolation(reason: WampURI): void {
+    private handleProtocolViolation(message: string): void {
         if (!this._transport) {
             this._logger.log(LogLevel.ERROR, 'Failed to handle protocol violation: Already closed.');
             return;
@@ -444,14 +452,15 @@ class Connection {
 
         const abortMessage: WampAbortMessage = [
             EWampMessageID.ABORT,
-            { message: reason },
+            { message },
             'wamp.error.protocol_violation',
         ];
 
-        this._logger.log(LogLevel.ERROR, `Protocol violation: ${reason}.`);
+        this._logger.log( LogLevel.ERROR, `Protocol violation: ${message}.`);
         this._transport.send(abortMessage);
-        this._transport.close(3000, 'protcol_violation', true);
-        this.handleOpen(new ConnectionOpenError('Protocol violation.'));
+
+        this._transport.close(3000, 'protocol_violation', message, true);
+        this.handleOpen(new ConnectionOpenError('protocol_violation', message));
     }
 
     private handleOpen(details: ConnectionOpenError | WelcomeDetails): boolean {

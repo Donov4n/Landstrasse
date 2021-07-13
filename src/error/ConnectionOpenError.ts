@@ -1,12 +1,10 @@
-import type { WampDict } from '../types/messages/MessageTypes';
-
 class ConnectionOpenError extends Error {
-    public readonly details: WampDict;
+    public readonly reason: string;
 
-    constructor(reason: string, details: WampDict = {}) {
-        super(reason);
+    constructor(reason: string, message?: string) {
+        super(message ? `${message} (${reason})` : reason);
 
-        this.details = details;
+        this.reason = reason;
     }
 }
 

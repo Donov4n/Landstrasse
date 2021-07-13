@@ -30,7 +30,7 @@ export enum CloseReason {
 export type CloseDetails = {
     code?: number,
     reason: string,
-    message?: string,
+    message: string,
     wasClean: boolean,
 };
 
