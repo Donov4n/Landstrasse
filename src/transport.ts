@@ -53,7 +53,6 @@ class WebSocketTransport implements TransportInterface {
                 code: ev.code,
                 reason: ev.reason,
                 message: 'Received close event.',
-                silent: false,
                 wasClean: ev.wasClean,
             });
         };
@@ -71,7 +70,7 @@ class WebSocketTransport implements TransportInterface {
         };
     }
 
-    public close(code: number, reason: string, message: string = '', silent: boolean = false): void {
+    public close(code: number, reason: string, message: string = ''): void {
         if (!this.webSocket || !this.callback) {
             return;
         }
@@ -85,7 +84,6 @@ class WebSocketTransport implements TransportInterface {
             code,
             reason,
             message,
-            silent,
             wasClean: true,
         });
 

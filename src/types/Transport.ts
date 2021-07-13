@@ -18,13 +18,12 @@ export type TransportEvent =
           code: number,
           reason: string,
           message: string,
-          silent: boolean,
           wasClean: boolean,
       };
 
 export interface TransportInterface {
     get isOpen(): boolean;
     open(endpoint: string, callback: (ev: TransportEvent) => void): void;
-    close(code: number, reason: string, message?: string, silent?: boolean): void;
+    close(code: number, reason: string, message?: string): void;
     send(message: WampMessage): Promise<void>;
 }

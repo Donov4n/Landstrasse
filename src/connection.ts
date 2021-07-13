@@ -80,9 +80,9 @@ class Connection {
 
     private _closedDeferred: Deferred | null = null;
 
-    private _isRetrying: boolean = false;
+    private _closeRequested: boolean = false;
 
-    private _shouldRetry: boolean = false;
+    private _isRetrying: boolean = false;
 
     private _retryTimer: number | null = null;
 
@@ -147,7 +147,7 @@ class Connection {
         }
 
         this.resetRetry();
-        this._shouldRetry = true;
+        this._closeRequested = false;
 
         this._logger.log(LogLevel.DEBUG, 'Opening Connection.');
         const deferred = this._openedDeferred = new Deferred();
@@ -167,7 +167,7 @@ class Connection {
         const deferred = this._closedDeferred = new Deferred();
 
         // - The app wants to close .. don't retry.
-        this._shouldRetry = false;
+        this._closeRequested = true;
 
         if (this._transport) {
             this._transport.send([
@@ -330,8 +330,7 @@ class Connection {
                     this.handleProtocolViolation('Protocol violation during session creation.');
                 } else {
                     const { message } = msg[1] ?? {};
-                    this._transport.close(3000, msg[2], message, true);
-                    this.handleOpen(new ConnectionOpenError(msg[2], message));
+                    this._transport.close(3000, msg[2], message);
                 }
                 break;
             }
@@ -409,16 +408,13 @@ class Connection {
             case ETransportEventType.ERROR: {
                 if (event.type === ETransportEventType.CRITICAL_ERROR || this.isConnecting) {
                     if (this._transport!.isOpen) {
-                        this._transport!.close(3000, 'connection_error', event.error, true);
+                        this._transport!.close(3000, 'connection_error', event.error);
                     } else {
                         this.resetConnectionInfos();
-                    }
-
-                    if (!this.handleOpen(new ConnectionOpenError('connection_error', event.error))) {
                         this.handleClose({
                             reason: 'connection_error',
                             message: event.error,
-                            wasClean: false,
+                            wasClean: true,
                         });
                     }
                 } else {
@@ -428,17 +424,12 @@ class Connection {
             }
             case ETransportEventType.CLOSE: {
                 this.resetConnectionInfos();
-
-                if (!event.silent) {
-                    if (!this.handleOpen(new ConnectionOpenError(event.reason, event.message))) {
-                        this.handleClose({
-                            code: event.code,
-                            reason: event.reason,
-                            message: event.message,
-                            wasClean: event.wasClean,
-                        });
-                    }
-                }
+                this.handleClose({
+                    code: event.code,
+                    reason: event.reason,
+                    message: event.message,
+                    wasClean: event.wasClean,
+                });
                 break;
             }
         }
@@ -458,9 +449,7 @@ class Connection {
 
         this._logger.log(LogLevel.ERROR, `Protocol violation: ${message}.`);
         this._transport.send(abortMessage);
-
-        this._transport.close(3000, 'protocol_violation', message, this.isConnecting);
-        this.handleOpen(new ConnectionOpenError('protocol_violation', message));
+        this._transport.close(3000, 'protocol_violation', message);
     }
 
     private handleOpen(details: ConnectionOpenError | WelcomeDetails): boolean {
@@ -489,17 +478,26 @@ class Connection {
     }
 
     private handleClose(details: CloseDetails): void {
+        const wasRequested = this._closeRequested;
+        const connectionError = new ConnectionOpenError(details.reason, details.message);
+        if (!wasRequested && this.handleOpen(connectionError)) {
+            return;
+        }
         this.resetRetryTimer();
 
-        let reason: CloseReason = this.isConnecting ? CloseReason.UNREACHABLE : CloseReason.LOST;
-        if (details.wasClean) {
-            reason = CloseReason.CLOSED;
-        }
+        const reason: CloseReason = !details.wasClean
+            ? (this.isConnecting ? CloseReason.UNREACHABLE : CloseReason.LOST)
+            : CloseReason.CLOSED;
 
-        this._logger.log(LogLevel[details.wasClean ? 'DEBUG' : 'WARNING'], 'Connection closed.', details);
+        this._logger.log(LogLevel[wasRequested ? 'DEBUG' : 'WARNING'], 'Connection closed.', details);
         const stopReconnecting = !!this._options.onClose?.(reason, details);
         if (!stopReconnecting && this.retryOpening()) {
             return;
+        }
+
+        if (this.isConnecting) {
+            this._openedDeferred?.reject(connectionError);
+            this._openedDeferred = null;
         }
 
         if (this._closedDeferred) {
@@ -530,7 +528,7 @@ class Connection {
     }
 
     private retryOpening(): boolean {
-        if (!this._shouldRetry) {
+        if (this._closeRequested) {
             return false;
         }
 
@@ -547,7 +545,7 @@ class Connection {
         }
 
         const retry = () => {
-            if (!this._shouldRetry) {
+            if (this._closeRequested) {
                 return;
             }
             this._open();
@@ -583,7 +581,7 @@ class Connection {
         this._retryCount += 1;
 
         let infos: RetryInfos = { count: null, delay: null, willRetry: false };
-        if (this._shouldRetry && (this._maxRetries === -1 || this._retryCount <= this._maxRetries)) {
+        if (!this._closeRequested && (this._maxRetries === -1 || this._retryCount <= this._maxRetries)) {
             infos = { count: this._retryCount, delay: this._retryDelay, willRetry: true };
         }
 
