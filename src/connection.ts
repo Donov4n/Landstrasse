@@ -7,6 +7,7 @@ import { ETransportEventType } from './types/Transport';
 import { GlobalIDGenerator, SessionIDGenerator } from './util/id';
 import { EWampMessageID } from './types/messages/MessageTypes';
 import { normalRand } from './util';
+import { CloseReason } from './types/Connection';
 import {
     ConnectionStateMachine,
     EConnectionState,
@@ -159,7 +160,7 @@ class Connection {
             this._logger.log(LogLevel.DEBUG, 'Closing Connection.');
             this._state.update([EMessageDirection.SENT, EWampMessageID.GOODBYE]);
         } else {
-            this.handleOnClose({
+            this.handleClose({
                 code: -1,
                 reason: 'Closed before retry.',
                 wasClean: true,
@@ -283,7 +284,7 @@ class Connection {
                 const [, sessionId, welcomeDetails] = msg as WampWelcomeMessage;
                 this._sessionId = sessionId;
                 this._logger.log(LogLevel.DEBUG, `Connection established.`, welcomeDetails);
-                this.handleOnOpen(welcomeDetails);
+                this.handleOpen(welcomeDetails);
                 break;
             }
             case EConnectionState.CLOSING: {
@@ -309,7 +310,7 @@ class Connection {
                     this.handleProtocolViolation('Protocol violation during session creation.');
                 } else {
                     this._transport.close(3000, msg[2], true);
-                    this.handleOnOpen(new ConnectionOpenError(msg[2], msg[1]));
+                    this.handleOpen(new ConnectionOpenError(msg[2], msg[1]));
                 }
                 break;
             }
@@ -387,7 +388,7 @@ class Connection {
                 this._logger.log(LogLevel.DEBUG, 'Connection error.', event.error);
                 if (this._state.current !== EConnectionState.ESTABLISHED) {
                     this._transport!.close(3000, 'connection_error', true);
-                    this.handleOnOpen(new ConnectionOpenError(event.error));
+                    this.handleOpen(new ConnectionOpenError(event.error));
                 }
                 break;
             }
@@ -400,8 +401,8 @@ class Connection {
                 }
 
                 if (!event.silent) {
-                    if (!this.handleOnOpen(new ConnectionOpenError(event.reason))) {
-                        this.handleOnClose({
+                    if (!this.handleOpen(new ConnectionOpenError(event.reason))) {
+                        this.handleClose({
                             code: event.code,
                             reason: event.reason,
                             wasClean: event.wasClean
@@ -428,10 +429,10 @@ class Connection {
         this._logger.log(LogLevel.ERROR, `Protocol violation: ${reason}.`);
         this._transport.send(abortMessage);
         this._transport.close(3000, 'protcol_violation', true);
-        this.handleOnOpen(new ConnectionOpenError('Protocol violation.'));
+        this.handleOpen(new ConnectionOpenError('Protocol violation.'));
     }
 
-    private handleOnOpen(details: Error | WelcomeDetails): boolean {
+    private handleOpen(details: Error | WelcomeDetails): boolean {
         if (!this._openedDeferred) {
             return false;
         }
@@ -446,7 +447,8 @@ class Connection {
         }
 
         this._logger.log(LogLevel.WARNING, 'Connection failed.', details);
-        if (this.retryOpening()) {
+        const stopReconnecting = !!this._options.onOpenError?.(details);
+        if (!stopReconnecting && this.retryOpening()) {
             return true;
         }
 
@@ -455,11 +457,16 @@ class Connection {
         return true;
     }
 
-    private handleOnClose(event: ConnectionCloseInfo): void {
+    private handleClose(details: ConnectionCloseInfo): void {
         this.resetRetryTimer();
 
-        this._logger.log(LogLevel[event.wasClean ? 'DEBUG' : 'WARNING'], 'Connection closed.', event);
-        const stopReconnecting = !!this._options.onClose?.(event);
+        let reason: CloseReason = details.wasClean ? CloseReason.CLOSED : CloseReason.LOST;
+        if (this._openedDeferred !== null) {
+            reason = CloseReason.UNREACHABLE;
+        }
+
+        this._logger.log(LogLevel[details.wasClean ? 'DEBUG' : 'WARNING'], 'Connection closed.', details);
+        const stopReconnecting = !!this._options.onClose?.(reason, details);
         if (!stopReconnecting && this.retryOpening()) {
             return;
         }

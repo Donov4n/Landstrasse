@@ -21,6 +21,12 @@ import type { WampDict, WampList } from './messages/MessageTypes';
 import type { AuthProviderInterface } from './AuthProvider';
 import type { LogFunction } from '../util/logger';
 
+export enum CloseReason {
+    CLOSED = 'closed',
+    LOST = 'lost',
+    UNREACHABLE = 'unreachable',
+}
+
 export type ConnectionCloseInfo = {
     reason: string;
     code: number;
@@ -40,7 +46,8 @@ export type OptionsBase = {
 
     // - Handlers
     onOpen?: (details: WelcomeDetails) => void,
-    onClose?: (infos: ConnectionCloseInfo) => void | boolean,
+    onClose?: (reason: CloseReason, infos: ConnectionCloseInfo) => void | boolean,
+    onOpenError?: (error: Error) => void | boolean,
 
     // - Retry options
     retryIfUnreachable?: boolean,
