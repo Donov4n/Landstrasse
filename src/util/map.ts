@@ -31,9 +31,9 @@ class PendingMap<TSucMsg extends WampMessage> {
 
     public close(): void {
         this._closed = true;
-        for (const pending of this._pendings) {
-            pending[1].reject('closing');
-        }
+        this._pendings.forEach((pending) => {
+            pending.reject('closing');
+        });
         this._pendings.clear();
     }
 

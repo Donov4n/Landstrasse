@@ -21,7 +21,6 @@ import Caller from './processor/caller';
 
 import type Registration from './processor/callee/generic/registration';
 import type Subscription from './processor/subscriber/generic/subscription';
-import type Publication from './processor/publisher/generic/publication';
 import type { CallOptions } from './types/messages/CallMessage';
 import type { HelloMessageDetails, WampHelloMessage } from './types/messages/HelloMessage';
 import type { PublishOptions } from './types/messages/PublishMessage';
@@ -31,7 +30,7 @@ import type { IdGenerators, ProcessorFactoryInterface } from './processor/Abstra
 import type { TransportInterface, TransportEvent } from './types/Transport';
 import type { SubscribeOptions } from './types/messages/SubscribeMessage';
 import type { SerializerInterface } from './types/Serializer';
-import type { WampDict, WampList, WampURI, } from './types/messages/MessageTypes';
+import type { WampID, WampDict, WampList, WampURI, } from './types/messages/MessageTypes';
 import type {
     WampGoodbyeMessage,
     WampAbortMessage,
@@ -235,7 +234,7 @@ class Connection {
         args?: A,
         kwargs?: K,
         opts?: PublishOptions,
-    ): Promise<Publication> {
+    ): Promise<WampID | void> {
         if (!this._processors) {
             return Promise.reject('Invalid session state.');
         }

@@ -53,10 +53,8 @@ class Registration {
     //
 
     private reinitCatch(err?: any) {
-        if (err !== 'closing') {
-            this.unregisteredDeferred = new Deferred<void>();
-            this.unregisteredDeferred.promise.catch((e) => this.reinitCatch(e));
-        }
+        this.unregisteredDeferred = new Deferred<void>();
+        this.unregisteredDeferred.promise.catch((e) => this.reinitCatch(e));
     }
 }
 

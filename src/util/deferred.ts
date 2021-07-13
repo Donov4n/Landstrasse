@@ -12,7 +12,12 @@ class Deferred<T = void> {
     }
 
     public resolve(value: T) {
-        this._resolveInternal!(value);
+        if (arguments.length === 0) {
+            // @ts-ignore
+            this._resolveInternal!();
+        } else {
+            this._resolveInternal!(value);
+        }
     }
 
     public reject(error?: any) {

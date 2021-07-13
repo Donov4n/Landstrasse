@@ -2,7 +2,7 @@ import AbstractProcessor from '../AbstractProcessor';
 import Publication from './generic/publication';
 import PendingMap from '../../util/map';
 import { LogLevel } from '../../util/logger';
-import { EWampMessageID } from '../../types/messages/MessageTypes';
+import { WampID, EWampMessageID } from '../../types/messages/MessageTypes';
 
 import type { WampMessage } from '../../types/Protocol';
 import type { WampDict, WampList, WampURI } from '../../types/messages/MessageTypes';
@@ -36,7 +36,7 @@ class Publisher extends AbstractProcessor {
         args?: A,
         kwArgs?: K,
         options?: PublishOptions,
-    ): Promise<Publication> {
+    ): Promise<WampID | void> {
         if (this._closed) {
             throw new Error('Publisher already closed.');
         }
@@ -46,7 +46,7 @@ class Publisher extends AbstractProcessor {
         this.logger.log(LogLevel.DEBUG, `Publishing "${topic}" (request id: ${requestId}).`, args, kwArgs, options);
 
         const publication = new Publication(requestId, !!options?.acknowledge);
-        if (!!options?.acknowledge) {
+        if (options?.acknowledge) {
             this._publicationRequests.add(requestId).then(
                 (published) => { publication.acknowledge(published[2]); },
                 (err) => { publication.fail(err); },
@@ -60,7 +60,7 @@ class Publisher extends AbstractProcessor {
             throw err;
         }
 
-        return publication;
+        return publication.promise;
     }
 
     //
