@@ -37,7 +37,7 @@ export type CloseDetails = {
 export type InlineAuth = {
     id?: string,
     method?: string,
-    extra?: Record<string, any>,
+    extra?: WampDict,
 };
 
 export type OptionsBase = {

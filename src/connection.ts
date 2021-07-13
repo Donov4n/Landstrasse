@@ -72,6 +72,7 @@ class Connection {
     private _state: ConnectionStateMachine;
 
     private _openedDeferred: Deferred<WelcomeDetails> | null = null;
+
     private _closedDeferred: Deferred | null = null;
 
     private _isRetrying: boolean = false;
@@ -104,7 +105,11 @@ class Connection {
         return this._sessionId;
     }
 
-    public get isOpening(): boolean {
+    public get isConnected(): boolean {
+        return this._state.current === EConnectionState.ESTABLISHED;
+    }
+
+    public get isConnecting(): boolean {
         return !!this._openedDeferred;
     }
 
@@ -132,8 +137,8 @@ class Connection {
             return this._openedDeferred.promise;
         }
 
-        if (this._transport) {
-            return Promise.reject('Transport already opened.');
+        if (this.isConnected || this._transport) {
+            return Promise.reject('Connection already opened or opening.');
         }
 
         this.resetRetry();
@@ -291,7 +296,7 @@ class Connection {
                 }) as any;
 
                 const [, sessionId, welcomeDetails] = msg as WampWelcomeMessage;
-                this._sessionId = sessionId;
+                this._sessionId = sessionId !== null ? sessionId : -1;
                 this._logger.log(LogLevel.DEBUG, `Connection established.`, welcomeDetails);
                 this.handleOpen(welcomeDetails);
                 break;
@@ -386,7 +391,7 @@ class Connection {
                 break;
             }
             case ETransportEventType.MESSAGE: {
-                if (this._state.current === EConnectionState.ESTABLISHED) {
+                if (this.isConnected) {
                     this.processMessage(event.message);
                 } else {
                     this.processSessionMessage(event.message);
@@ -395,11 +400,11 @@ class Connection {
             }
             case ETransportEventType.CRITICAL_ERROR:
             case ETransportEventType.ERROR: {
-                if (event.type === ETransportEventType.CRITICAL_ERROR || this.isOpening) {
+                if (event.type === ETransportEventType.CRITICAL_ERROR || this.isConnecting) {
                     if (this._transport!.isOpen) {
                         this._transport!.close(3000, 'connection_error', true);
                     } else {
-                        this._resetConnection();
+                        this.resetConnectionInfos();
                     }
 
                     if (!this.handleOpen(new ConnectionOpenError(event.error))) {
@@ -415,7 +420,7 @@ class Connection {
                 break;
             }
             case ETransportEventType.CLOSE: {
-                this._resetConnection();
+                this.resetConnectionInfos();
 
                 if (!event.silent) {
                     if (!this.handleOpen(new ConnectionOpenError(event.reason))) {
@@ -449,7 +454,7 @@ class Connection {
         this.handleOpen(new ConnectionOpenError('Protocol violation.'));
     }
 
-    private handleOpen(details: Error | WelcomeDetails): boolean {
+    private handleOpen(details: ConnectionOpenError | WelcomeDetails): boolean {
         if (!this._openedDeferred) {
             return false;
         }
@@ -478,7 +483,7 @@ class Connection {
         this.resetRetryTimer();
 
         let reason: CloseReason = details.wasClean ? CloseReason.CLOSED : CloseReason.LOST;
-        if (this.isOpening) {
+        if (this.isConnecting) {
             reason = CloseReason.UNREACHABLE;
         }
 
@@ -498,19 +503,8 @@ class Connection {
     // - Internal
     //
 
-    private _resetConnection(): void {
-        this._transport = null;
-        this._sessionId = null;
-        this._state = new ConnectionStateMachine();
-
-        if (this._processors) {
-            this._processors.forEach((processor) => processor.close());
-            this._processors = null;
-        }
-    }
-
     private _open(): void {
-        if (this._transport) {
+        if (this.isConnected || this._transport) {
             return;
         }
 
@@ -532,7 +526,7 @@ class Connection {
         }
 
         // - Closed while connecting.
-        if (this.isOpening && !this._options.retryIfUnreachable) {
+        if (this.isConnecting && !this._options.retryIfUnreachable) {
             this._logger.log(LogLevel.WARNING, 'Auto-reconnect disabled!');
             return false;
         }
@@ -588,6 +582,17 @@ class Connection {
         this._retryDelay = this._retryDelay * 1.5;
 
         return infos;
+    }
+
+    private resetConnectionInfos(): void {
+        this._transport = null;
+        this._sessionId = null;
+        this._state = new ConnectionStateMachine();
+
+        if (this._processors) {
+            this._processors.forEach((processor) => processor.close());
+            this._processors = null;
+        }
     }
 }
 

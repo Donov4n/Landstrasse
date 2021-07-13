@@ -37,7 +37,7 @@ class Logger {
                 [LogLevel.INFO]: 'log',
             };
             const method = level in methodMap ? methodMap[level] : 'log';
-            console[method](message, ...details);
+            console[method](`[WebSocket] ${message}`, ...details);
         }
     }
 }
