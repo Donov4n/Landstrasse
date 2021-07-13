@@ -150,10 +150,10 @@ class Connection {
         this._shouldRetry = true;
 
         this._logger.log(LogLevel.DEBUG, 'Opening Connection.');
-        this._openedDeferred = new Deferred();
+        const deferred = this._openedDeferred = new Deferred();
         this._open();
 
-        return this._openedDeferred.promise;
+        return deferred.promise;
     }
 
     public close(): Promise<void> {
@@ -164,7 +164,7 @@ class Connection {
         if (this._closedDeferred) {
             return this._closedDeferred.promise;
         }
-        this._closedDeferred = new Deferred();
+        const deferred = this._closedDeferred = new Deferred();
 
         // - The app wants to close .. don't retry.
         this._shouldRetry = false;
@@ -186,7 +186,7 @@ class Connection {
             });
         }
 
-        return this._closedDeferred.promise;
+        return deferred.promise;
     }
 
     //
@@ -284,7 +284,7 @@ class Connection {
                         if (!this._transport) {
                             return;
                         }
-                        this._logger.log(LogLevel.WARNING, 'Failed to compute challenge.', error);
+                        this._logger.log(LogLevel.ERROR, 'Failed to compute challenge.', error);
                         this._transport.close(3000, 'auth_challenge_failed', 'Failed to compute challenge.');
                     });
                 break;
@@ -422,7 +422,7 @@ class Connection {
                         });
                     }
                 } else {
-                    this._logger.log(LogLevel.DEBUG, 'Transport error.', event.error);
+                    this._logger.log(LogLevel.WARNING, 'Transport error.', event.error);
                 }
                 break;
             }
@@ -456,15 +456,15 @@ class Connection {
             'wamp.error.protocol_violation',
         ];
 
-        this._logger.log( LogLevel.ERROR, `Protocol violation: ${message}.`);
+        this._logger.log(LogLevel.ERROR, `Protocol violation: ${message}.`);
         this._transport.send(abortMessage);
 
-        this._transport.close(3000, 'protocol_violation', message, true);
+        this._transport.close(3000, 'protocol_violation', message, this.isConnecting);
         this.handleOpen(new ConnectionOpenError('protocol_violation', message));
     }
 
     private handleOpen(details: ConnectionOpenError | WelcomeDetails): boolean {
-        if (!this._openedDeferred) {
+        if (!this.isConnecting) {
             return false;
         }
         this.resetRetryTimer();
@@ -472,7 +472,7 @@ class Connection {
         if (!(details instanceof Error)) {
             this.resetRetry();
             this._options.onOpen?.(details);
-            this._openedDeferred.resolve(details);
+            this._openedDeferred?.resolve(details);
             this._openedDeferred = null;
             return true;
         }
@@ -483,7 +483,7 @@ class Connection {
             return true;
         }
 
-        this._openedDeferred.reject(details);
+        this._openedDeferred?.reject(details);
         this._openedDeferred = null;
         return true;
     }
@@ -491,9 +491,9 @@ class Connection {
     private handleClose(details: CloseDetails): void {
         this.resetRetryTimer();
 
-        let reason: CloseReason = details.wasClean ? CloseReason.CLOSED : CloseReason.LOST;
-        if (this.isConnecting) {
-            reason = CloseReason.UNREACHABLE;
+        let reason: CloseReason = this.isConnecting ? CloseReason.UNREACHABLE : CloseReason.LOST;
+        if (details.wasClean) {
+            reason = CloseReason.CLOSED;
         }
 
         this._logger.log(LogLevel[details.wasClean ? 'DEBUG' : 'WARNING'], 'Connection closed.', details);

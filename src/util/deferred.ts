@@ -1,21 +1,22 @@
 class Deferred<T = void> {
-    public promise: Promise<T>;
-    private resolveInternal?: (v: T) => void;
-    private rejectInternal?: (reason?: any) => void;
+    public readonly promise: Promise<T>;
+
+    private _resolveInternal?: (value: T) => void;
+    private _rejectInternal?: (reason?: any) => void;
 
     constructor() {
         this.promise = new Promise((resolve, reject) => {
-            this.resolveInternal = resolve;
-            this.rejectInternal = reject;
+            this._resolveInternal = resolve;
+            this._rejectInternal = reject;
         });
     }
 
-    public resolve(v: T) {
-        this.resolveInternal!(v);
+    public resolve(value: T) {
+        this._resolveInternal!(value);
     }
 
-    public reject(err?: any) {
-        this.rejectInternal!(err);
+    public reject(error?: any) {
+        this._rejectInternal!(error);
     }
 }
 
