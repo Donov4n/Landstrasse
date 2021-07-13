@@ -64,7 +64,7 @@ class WebSocketTransport implements TransportInterface {
             this.webSocket = null;
 
             cb({
-                type: ETransportEventType.ERROR,
+                type: ETransportEventType.CRITICAL_ERROR,
                 error: `Transport critical error${err.error ? `: ${err.error}` : ''}.`,
             });
         };
