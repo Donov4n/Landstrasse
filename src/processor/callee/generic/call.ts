@@ -12,8 +12,10 @@ import type { WampDict, WampID, WampList } from '../../../types/messages/Message
 
 class Call {
     public progress = false;
+
     public cancelled = false;
-    private onCancel = new Deferred<void>();
+
+    private _cancelledDeferred = new Deferred<void>();
 
     constructor(
         handler: CallHandler<WampList, WampDict, WampList, WampDict>,
@@ -28,12 +30,12 @@ class Call {
         args = args || [];
         kwArgs = kwArgs || {};
         details = details || {};
-        details.onCancel = this.onCancel.promise;
+        details.onCancel = this._cancelledDeferred.promise;
 
         // We want to actively catch rejected cancel promises.
         // Rejecting this cancel promise means, that the call wasn't canceled and completed, so
         // dropping any error is fine here.
-        this.onCancel.promise.catch(() => {});
+        this._cancelledDeferred.promise.catch(() => {});
         this.progress = details && !!details.receive_progress;
 
         setTimeout(
@@ -54,7 +56,7 @@ class Call {
             return;
         }
         this.cancelled = true;
-        this.onCancel.resolve();
+        this._cancelledDeferred.resolve();
     }
 
     //
@@ -72,7 +74,7 @@ class Call {
             ];
 
             if (!res.nextResult && !this.cancelled) {
-                this.onCancel.reject();
+                this._cancelledDeferred.reject();
             }
 
             try {
@@ -114,7 +116,7 @@ class Call {
         const errorMessage = wampError.toErrorMessage(this.callId);
 
         if (!this.cancelled) {
-            this.onCancel.reject();
+            this._cancelledDeferred.reject();
         }
 
         this.logger.log(

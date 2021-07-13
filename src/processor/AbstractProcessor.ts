@@ -28,7 +28,7 @@ export interface ProcessorFactoryInterface {
 }
 
 abstract class AbstractProcessor implements ProcessorInterface {
-    protected closed = false;
+    protected _closed = false;
 
     constructor(
         protected sender: MessageSender,
@@ -38,12 +38,12 @@ abstract class AbstractProcessor implements ProcessorInterface {
     ) {}
 
     public close(): void {
-        this.closed = true;
+        this._closed = true;
         this.onClose();
     }
 
     public processMessage(msg: WampMessage): boolean {
-        if (this.closed) {
+        if (this._closed) {
             return false;
         }
         return this.onMessage(msg);

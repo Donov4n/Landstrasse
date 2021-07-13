@@ -7,21 +7,21 @@ type UnregisterCallback = (registration: Registration) => Promise<void>;
 type RegistrationHandler = CallHandler<WampList, WampDict, WampList, WampDict>;
 
 class Registration {
-    readonly #id: WampID;
-    readonly #uri: WampURI;
+    private readonly _id: WampID;
+    private readonly _uri: WampURI;
 
-    #unregisterCallback: UnregisterCallback;
+    private _unregisterCallback: UnregisterCallback;
 
     public readonly handler: RegistrationHandler;
 
     public unregisteredDeferred = new Deferred<void>();
 
     public get id(): WampID {
-        return this.#id;
+        return this._id;
     }
 
     public get uri(): WampURI {
-        return this.#uri;
+        return this._uri;
     }
 
     public get unregistered(): Promise<void> {
@@ -34,16 +34,16 @@ class Registration {
         handler: RegistrationHandler,
         unregisterCallback: UnregisterCallback,
     ) {
-        this.#id = id;
-        this.#uri = uri;
-        this.#unregisterCallback = unregisterCallback;
+        this._id = id;
+        this._uri = uri;
+        this._unregisterCallback = unregisterCallback;
         this.handler = handler;
 
         this.reinitCatch();
     }
 
     public async unregister(): Promise<void> {
-        await this.#unregisterCallback(this);
+        await this._unregisterCallback(this);
 
         return this.unregistered;
     }

@@ -30,7 +30,7 @@ class Caller extends AbstractProcessor {
         };
     }
 
-    private pendingCalls = new Map<WampID, [request: CallRequest, withProgress: boolean]>();
+    private _pendingCalls = new Map<WampID, [request: CallRequest, withProgress: boolean]>();
 
     public call<A extends WampList, K extends WampDict, RA extends WampList, RK extends WampDict>(
         uri: WampURI,
@@ -38,7 +38,7 @@ class Caller extends AbstractProcessor {
         kwArgs?: K,
         details?: CallOptions,
     ): CallReturn<RA, RK> {
-        if (this.closed) {
+        if (this._closed) {
             return [
                 Promise.reject('Caller closed.'),
                 () => Promise.resolve(),
@@ -52,13 +52,13 @@ class Caller extends AbstractProcessor {
 
         const executor = async () => {
             const result = new Deferred<CallResult<RA, RK>>();
-            this.pendingCalls.set(requestId, [result as Deferred<CallResult<any, any>>, withProgress]);
+            this._pendingCalls.set(requestId, [result as Deferred<CallResult<any, any>>, withProgress]);
 
             try {
                 await this.sender(message);
             } catch (err) {
                 this.logger.log(LogLevel.WARNING, `Call to "${uri}" failed.`, err);
-                this.pendingCalls.delete(requestId);
+                this._pendingCalls.delete(requestId);
                 throw err;
             }
 
@@ -70,11 +70,11 @@ class Caller extends AbstractProcessor {
     }
 
     public async cancel(requestId: WampID, killMode?: ECallKillMode): Promise<void> {
-        if (this.closed) {
+        if (this._closed) {
             throw new Error('Caller closed.');
         }
 
-        const call = this.pendingCalls.get(requestId);
+        const call = this._pendingCalls.get(requestId);
         if (!call) {
             throw new Error('Unexpected cancellation (unable to find the related call).');
         }
@@ -92,11 +92,11 @@ class Caller extends AbstractProcessor {
     protected onMessage(msg: WampMessage): boolean {
         if (msg[0] === EWampMessageID.RESULT) {
             const requestId = msg[1];
-            if (!this.pendingCalls.has(requestId)) {
+            if (!this._pendingCalls.has(requestId)) {
                 this.violator('Unexpected result received (unable to find the related call).');
                 return true;
             }
-            const [callRequest, awaitedProgress] = this.pendingCalls.get(requestId)!;
+            const [callRequest, awaitedProgress] = this._pendingCalls.get(requestId)!;
 
             const details = msg[2] || {};
             const resultArgs = msg[3] || [];
@@ -112,25 +112,25 @@ class Caller extends AbstractProcessor {
 
                 const nextCallRequest = new Deferred<CallResult<WampList, WampDict>>();
                 callRequest.resolve({ args: resultArgs, kwArgs: resultKwargs, nextResult: nextCallRequest.promise });
-                this.pendingCalls.set(requestId, [nextCallRequest, true]);
+                this._pendingCalls.set(requestId, [nextCallRequest, true]);
             } else {
                 this.logger.log(LogLevel.DEBUG, `Received result for call ${requestId}.`, resultArgs, resultKwargs);
                 callRequest.resolve({ args: resultArgs, kwArgs: resultKwargs, nextResult: null });
-                this.pendingCalls.delete(requestId);
+                this._pendingCalls.delete(requestId);
             }
             return true;
         }
 
         if (msg[0] === EWampMessageID.ERROR && msg[1] === EWampMessageID.CALL) {
             const requestId = msg[2];
-            if (!this.pendingCalls.has(requestId)) {
+            if (!this._pendingCalls.has(requestId)) {
                 this.violator('Unexpected call error received (unable to find the related call).');
                 return true;
             }
-            const [callRequest] = this.pendingCalls.get(requestId)!;
+            const [callRequest] = this._pendingCalls.get(requestId)!;
 
             this.logger.log(LogLevel.WARNING, `Received error for call ${requestId}.`, msg[4]);
-            this.pendingCalls.delete(requestId);
+            this._pendingCalls.delete(requestId);
             callRequest.reject(msg[4]);
 
             return true;
@@ -140,10 +140,10 @@ class Caller extends AbstractProcessor {
     }
 
     protected onClose(): void {
-        this.pendingCalls.forEach(([request]) => {
+        this._pendingCalls.forEach(([request]) => {
             request.reject('Caller closing.');
         });
-        this.pendingCalls.clear();
+        this._pendingCalls.clear();
     }
 }
 

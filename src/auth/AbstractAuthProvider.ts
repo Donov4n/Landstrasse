@@ -2,8 +2,8 @@ import type { AuthProviderInterface, Signature } from '../types/AuthProvider';
 import type { WampDict } from '../types/messages/MessageTypes';
 
 abstract class AbstractAuthProvider implements AuthProviderInterface {
-    private _authId: string;
-    private _authMethod: string;
+    private readonly _authId: string;
+    private readonly _authMethod: string;
 
     /** @inheritDoc */
     public get authId(): string {

@@ -27,10 +27,11 @@ export enum CloseReason {
     UNREACHABLE = 'unreachable',
 }
 
-export type ConnectionCloseInfo = {
-    reason: string;
-    code: number;
-    wasClean: boolean;
+export type CloseDetails = {
+    code?: number,
+    reason: string,
+    message?: string,
+    wasClean: boolean,
 };
 
 export type InlineAuth = {
@@ -46,7 +47,7 @@ export type OptionsBase = {
 
     // - Handlers
     onOpen?: (details: WelcomeDetails) => void,
-    onClose?: (reason: CloseReason, infos: ConnectionCloseInfo) => void | boolean,
+    onClose?: (reason: CloseReason, details: CloseDetails) => void | boolean,
     onOpenError?: (error: Error) => void | boolean,
 
     // - Retry options
@@ -60,6 +61,10 @@ export type Options = OptionsBase & (
     | { auth?: InlineAuth }
     | { authProvider?: AuthProviderInterface }
 );
+
+export type RetryInfos =
+    | { count: null, delay: null, willRetry: false }
+    | { count: number, delay: number, willRetry: true };
 
 export type CallResult<TArgs extends WampList, TKwArgs extends WampDict> = {
     args: TArgs;

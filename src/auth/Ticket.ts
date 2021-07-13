@@ -24,7 +24,7 @@ export type TicketFunction = (authExtra: WampDict) => Promise<Signature>;
  * This can be used to login with username and password or any other sort of static token.
  */
 class TicketAuthProvider extends AbstractAuthProvider {
-    private ticketFunction: TicketFunction;
+    private readonly _ticketFunction: TicketFunction;
 
     public get isTransportLevel(): boolean {
         return false;
@@ -40,12 +40,12 @@ class TicketAuthProvider extends AbstractAuthProvider {
     constructor(authId: string, ticketFunction: TicketFunction, authMethod: string = 'ticket') {
         super(authId, authMethod);
 
-        this.ticketFunction = ticketFunction;
+        this._ticketFunction = ticketFunction;
     }
 
     /** @inheritDoc */
     public computeChallenge(authExtra: WampDict): Promise<Signature> {
-        return this.ticketFunction(authExtra);
+        return this._ticketFunction(authExtra);
     }
 }
 

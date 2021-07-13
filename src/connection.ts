@@ -33,11 +33,21 @@ import type { TransportInterface, TransportEvent } from './types/Transport';
 import type { SubscribeOptions } from './types/messages/SubscribeMessage';
 import type { SerializerInterface } from './types/Serializer';
 import type { WampDict, WampList, WampURI, } from './types/messages/MessageTypes';
-import type { CallHandler, CallReturn, ConnectionCloseInfo, Options, EventHandler } from './types/Connection';
+import type {
+    Options,
+    CallHandler,
+    CallReturn,
+    CloseDetails,
+    EventHandler,
+    RetryInfos,
+} from './types/Connection';
 
-type RetryInfos =
-    | { count: null, delay: null, willRetry: false }
-    | { count: number, delay: number, willRetry: true };
+const PROCESSOR_FACTORIES: ProcessorFactoryInterface[] = [
+    Publisher,
+    Subscriber,
+    Caller,
+    Callee
+];
 
 const createIdGenerators = (): IdGenerators => ({
     global: new GlobalIDGenerator(),
@@ -51,18 +61,15 @@ class Connection {
 
     private readonly _realm: string;
 
+    private readonly _serializer: SerializerInterface;
+
+    private _processors: [Publisher, Subscriber, Caller, Callee] | null = null;
+
     private _sessionId: number | null = null;
 
     private _transport: TransportInterface | null = null;
 
-    // - The type of processors has to match the order of the factories in processorFactories.
-    private _processors: [Publisher, Subscriber, Caller, Callee] | null = null;
-    private _processorsFactories: ProcessorFactoryInterface[] = [Publisher, Subscriber, Caller, Callee];
-
-    private _idGenerators: IdGenerators;
     private _state: ConnectionStateMachine;
-
-    private _serializer: SerializerInterface;
 
     private _openedDeferred: Deferred<WelcomeDetails> | null = null;
     private _closedDeferred: Deferred | null = null;
@@ -97,6 +104,10 @@ class Connection {
         return this._sessionId;
     }
 
+    public get isOpening(): boolean {
+        return !!this._openedDeferred;
+    }
+
     public get isRetrying(): boolean {
         return this._isRetrying;
     }
@@ -113,25 +124,23 @@ class Connection {
         this._retryDelay = this._retryDelayInitial;
 
         this._state = new ConnectionStateMachine();
-        this._idGenerators = createIdGenerators();
-
         this._logger = new Logger(options.logFunction, !!options.debug);
     }
 
     public open(): Promise<WelcomeDetails> {
-        if (this._transport) {
-            return Promise.reject('Transport already opened or opening.');
-        }
-
         if (this._openedDeferred) {
             return this._openedDeferred.promise;
         }
-        this._openedDeferred = new Deferred();
+
+        if (this._transport) {
+            return Promise.reject('Transport already opened.');
+        }
 
         this.resetRetry();
         this._shouldRetry = true;
 
         this._logger.log(LogLevel.DEBUG, 'Opening Connection.');
+        this._openedDeferred = new Deferred();
         this._open();
 
         return this._openedDeferred.promise;
@@ -174,7 +183,7 @@ class Connection {
     // - WAMP methods.
     //
 
-    public call<A extends WampList, K extends WampDict, RA extends WampList, RK extends WampDict>(
+    public call<A extends WampList = WampList, K extends WampDict = WampDict, RA extends WampList = WampList, RK extends WampDict = WampDict>(
         uri: WampURI,
         args?: A,
         kwargs?: K,
@@ -189,7 +198,7 @@ class Connection {
         return this._processors[2].call(uri, args, kwargs, opts);
     }
 
-    public register<A extends WampList, K extends WampDict, RA extends WampList, RK extends WampDict>(
+    public register<A extends WampList = WampList, K extends WampDict = WampDict, RA extends WampList = WampList, RK extends WampDict = WampDict>(
         uri: WampURI,
         handler: CallHandler<A, K, RA, RK>,
         opts?: RegisterOptions,
@@ -200,7 +209,7 @@ class Connection {
         return this._processors[3].register(uri, handler, opts);
     }
 
-    public subscribe<A extends WampList, K extends WampDict>(
+    public subscribe<A extends WampList = WampList, K extends WampDict = WampDict>(
         uri: WampURI,
         handler: EventHandler<A, K>,
         opts?: SubscribeOptions,
@@ -211,7 +220,7 @@ class Connection {
         return this._processors[1].subscribe(uri, handler, opts);
     }
 
-    public publish<A extends WampList, K extends WampDict>(
+    public publish<A extends WampList = WampList, K extends WampDict = WampDict>(
         uri: WampURI,
         args?: A,
         kwargs?: K,
@@ -271,12 +280,12 @@ class Connection {
                 break;
             }
             case EConnectionState.ESTABLISHED: {
-                this._idGenerators = createIdGenerators();
-                this._processors = this._processorsFactories.map((procssorClass) => {
+                const idGenerators = createIdGenerators();
+                this._processors = PROCESSOR_FACTORIES.map((procssorClass) => {
                     return new procssorClass(
                         (msg) => this._transport!.send(msg),
                         (reason) => { this.handleProtocolViolation(reason); },
-                        this._idGenerators,
+                        idGenerators,
                         this._logger,
                     );
                 }) as any;
@@ -335,7 +344,7 @@ class Connection {
 
     private sendHello(): void {
         const details: HelloMessageDetails = {
-            roles: Object.assign({}, ...this._processorsFactories.map(
+            roles: Object.assign({}, ...PROCESSOR_FACTORIES.map(
                 (processor) => processor.getFeatures(),
             )),
         };
@@ -384,21 +393,29 @@ class Connection {
                 }
                 break;
             }
+            case ETransportEventType.CRITICAL_ERROR:
             case ETransportEventType.ERROR: {
-                this._logger.log(LogLevel.DEBUG, 'Connection error.', event.error);
-                if (this._state.current !== EConnectionState.ESTABLISHED) {
-                    this._transport!.close(3000, 'connection_error', true);
-                    this.handleOpen(new ConnectionOpenError(event.error));
+                if (event.type === ETransportEventType.CRITICAL_ERROR || this.isOpening) {
+                    if (this._transport!.isOpen) {
+                        this._transport!.close(3000, 'connection_error', true);
+                    } else {
+                        this._resetConnection();
+                    }
+
+                    if (!this.handleOpen(new ConnectionOpenError(event.error))) {
+                        this.handleClose({
+                            reason: 'Transport error.',
+                            message: event.error,
+                            wasClean: false
+                        });
+                    }
+                } else {
+                    this._logger.log(LogLevel.DEBUG, 'Transport error.', event.error);
                 }
                 break;
             }
             case ETransportEventType.CLOSE: {
-                this._transport = null;
-                this._state = new ConnectionStateMachine();
-                if (this._processors) {
-                    this._processors.forEach((processor) => processor.close());
-                    this._processors = null;
-                }
+                this._resetConnection();
 
                 if (!event.silent) {
                     if (!this.handleOpen(new ConnectionOpenError(event.reason))) {
@@ -457,11 +474,11 @@ class Connection {
         return true;
     }
 
-    private handleClose(details: ConnectionCloseInfo): void {
+    private handleClose(details: CloseDetails): void {
         this.resetRetryTimer();
 
         let reason: CloseReason = details.wasClean ? CloseReason.CLOSED : CloseReason.LOST;
-        if (this._openedDeferred !== null) {
+        if (this.isOpening) {
             reason = CloseReason.UNREACHABLE;
         }
 
@@ -480,6 +497,17 @@ class Connection {
     //
     // - Internal
     //
+
+    private _resetConnection(): void {
+        this._transport = null;
+        this._sessionId = null;
+        this._state = new ConnectionStateMachine();
+
+        if (this._processors) {
+            this._processors.forEach((processor) => processor.close());
+            this._processors = null;
+        }
+    }
 
     private _open(): void {
         if (this._transport) {
@@ -504,8 +532,7 @@ class Connection {
         }
 
         // - Closed while connecting.
-        const isConnecting = !!this._openedDeferred;
-        if (isConnecting && !this._options.retryIfUnreachable) {
+        if (this.isOpening && !this._options.retryIfUnreachable) {
             this._logger.log(LogLevel.WARNING, 'Auto-reconnect disabled!');
             return false;
         }

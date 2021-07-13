@@ -26,7 +26,7 @@ class Publisher extends AbstractProcessor {
         };
     }
 
-    private publicationRequests = new PendingMap<WampPublishedMessage>(
+    private _publicationRequests = new PendingMap<WampPublishedMessage>(
         EWampMessageID.PUBLISH,
         EWampMessageID.PUBLISHED,
     );
@@ -37,7 +37,7 @@ class Publisher extends AbstractProcessor {
         kwArgs?: K,
         options?: PublishOptions,
     ): Promise<Publication> {
-        if (this.closed) {
+        if (this._closed) {
             throw new Error('Publisher already closed.');
         }
 
@@ -47,7 +47,7 @@ class Publisher extends AbstractProcessor {
 
         const publication = new Publication(requestId, !!options?.acknowledge);
         if (!!options?.acknowledge) {
-            this.publicationRequests.add(requestId).then(
+            this._publicationRequests.add(requestId).then(
                 (published) => { publication.acknowledge(published[2]); },
                 (err) => { publication.fail(err); },
             );
@@ -56,7 +56,7 @@ class Publisher extends AbstractProcessor {
         try {
             await this.sender(message);
         } catch (err) {
-            this.publicationRequests.reject(requestId, err);
+            this._publicationRequests.reject(requestId, err);
             throw err;
         }
 
@@ -68,7 +68,7 @@ class Publisher extends AbstractProcessor {
     //
 
     protected onMessage(msg: WampMessage): boolean {
-        const [handled, success, error] = this.publicationRequests.handle(msg);
+        const [handled, success, error] = this._publicationRequests.handle(msg);
         if (handled && !success) {
             this.violator(error);
         }
@@ -76,7 +76,7 @@ class Publisher extends AbstractProcessor {
     }
 
     protected onClose(): void {
-        this.publicationRequests.close();
+        this._publicationRequests.close();
     }
 }
 

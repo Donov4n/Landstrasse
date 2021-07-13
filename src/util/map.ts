@@ -5,8 +5,8 @@ import type { WampID } from '../types/messages/MessageTypes';
 import type { WampMessage } from '../types/Protocol';
 
 class PendingMap<TSucMsg extends WampMessage> {
-    private pendings = new Map<WampID, Deferred<TSucMsg>>();
-    private closed = false;
+    private _pendings = new Map<WampID, Deferred<TSucMsg>>();
+    private _closed = false;
 
     constructor(
         private initMsg: EWampMessageID,
@@ -16,25 +16,25 @@ class PendingMap<TSucMsg extends WampMessage> {
 
     public add(id: WampID): Promise<TSucMsg> {
         const deferred = new Deferred<TSucMsg>();
-        this.pendings.set(id, deferred);
+        this._pendings.set(id, deferred);
         return deferred.promise;
     }
 
     public reject(pendingId: WampID, err?: any): void {
-        const deferred = this.pendings.get(pendingId);
+        const deferred = this._pendings.get(pendingId);
         if (!deferred) {
             return;
         }
-        this.pendings.delete(pendingId);
+        this._pendings.delete(pendingId);
         deferred.reject(err);
     }
 
     public close(): void {
-        this.closed = true;
-        for (const pending of this.pendings) {
+        this._closed = true;
+        for (const pending of this._pendings) {
             pending[1].reject('closing');
         }
-        this.pendings.clear();
+        this._pendings.clear();
     }
 
     //
@@ -42,7 +42,7 @@ class PendingMap<TSucMsg extends WampMessage> {
     //
 
     public handle(msg: WampMessage): [boolean, boolean, string] {
-        if (this.closed) {
+        if (this._closed) {
             return [false, true, ''];
         }
 
@@ -77,8 +77,8 @@ class PendingMap<TSucMsg extends WampMessage> {
     }
 
     private getAndDelete(id: WampID): Deferred<TSucMsg> | null {
-        const val = this.pendings.get(id);
-        this.pendings.delete(id);
+        const val = this._pendings.get(id);
+        this._pendings.delete(id);
         return val || null;
     }
 }

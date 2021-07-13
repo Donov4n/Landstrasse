@@ -12,6 +12,10 @@ class WebSocketTransport implements TransportInterface {
 
     constructor(private serializer: SerializerInterface) {}
 
+    public get isOpen(): boolean {
+        return !!this.webSocket;
+    }
+
     public open(endpoint: string, cb: (ev: TransportEvent) => void) {
         if (this.webSocket) {
             cb({ type: ETransportEventType.ERROR, error: 'Transport already opened!' });
@@ -61,7 +65,7 @@ class WebSocketTransport implements TransportInterface {
 
             cb({
                 type: ETransportEventType.ERROR,
-                error: `Transport error: ${err.error}`,
+                error: `Transport critical error${err.error ? `: ${err.error}` : ''}.`,
             });
         };
     }

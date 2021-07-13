@@ -32,15 +32,15 @@ class Callee extends AbstractProcessor {
         };
     }
 
-    private registrations = new Map<WampID, Registration>();
-    private runningCalls = new Map<WampID, Call>();
+    private _registrations = new Map<WampID, Registration>();
+    private _runningCalls = new Map<WampID, Call>();
 
-    private registrationRequests = new PendingMap<WampRegisteredMessage>(
+    private _registrationRequests = new PendingMap<WampRegisteredMessage>(
         EWampMessageID.REGISTER,
         EWampMessageID.REGISTERED,
     );
 
-    private unregistrationsRequests = new PendingMap<WampUnregisteredMessage>(
+    private _unregistrationsRequests = new PendingMap<WampUnregisteredMessage>(
         EWampMessageID.UNREGISTER,
         EWampMessageID.UNREGISTERED,
         ([,, details]) => {
@@ -49,12 +49,12 @@ class Callee extends AbstractProcessor {
             }
             const id = details.registration;
 
-            const registration = this.registrations.get(id);
+            const registration = this._registrations.get(id);
             if (!registration) {
                 return [false, `Unexpected unregistration (unknown registration id ${id}).`];
             }
 
-            this.registrations.delete(id);
+            this._registrations.delete(id);
             registration.unregisteredDeferred.resolve();
 
             return [true, ''];
@@ -66,19 +66,19 @@ class Callee extends AbstractProcessor {
         handler: CallHandler<A, K, RA, RK>,
         options?: RegisterOptions,
     ): Promise<Registration> {
-        if (this.closed) {
+        if (this._closed) {
             return Promise.reject('Callee closed.');
         }
 
         const requestId = this.idGenerators.session.id();
         const message: WampRegisterMessage = [EWampMessageID.REGISTER, requestId, options || {}, uri];
-        const request = this.registrationRequests.add(requestId);
+        const request = this._registrationRequests.add(requestId);
         this.logger.log(LogLevel.DEBUG, `Registering "${uri}" (request id: ${requestId}).`, options);
 
         try {
             await this.sender(message);
         } catch (err) {
-            this.registrationRequests.reject(requestId, err);
+            this._registrationRequests.reject(requestId, err);
             throw err;
         }
 
@@ -89,30 +89,30 @@ class Callee extends AbstractProcessor {
             handler as any,
             async (registration) => await this.unregister(registration),
         );
-        this.registrations.set(registrationId, registration);
+        this._registrations.set(registrationId, registration);
 
         return registration;
     }
 
     private async unregister(registration: Registration): Promise<void> {
-        if (this.closed) {
+        if (this._closed) {
             throw new Error('Callee closed.');
         }
 
         const requestId = this.idGenerators.session.id();
         const message: WampUnregisterMessage = [EWampMessageID.UNREGISTER, requestId, registration.id];
-        const request = this.unregistrationsRequests.add(requestId);
+        const request = this._unregistrationsRequests.add(requestId);
 
         try {
             try {
                 await this.sender(message);
             } catch (err) {
-                this.unregistrationsRequests.reject(requestId, err);
+                this._unregistrationsRequests.reject(requestId, err);
                 throw err;
             }
 
             await request;
-            this.registrations.delete(registration.id);
+            this._registrations.delete(registration.id);
             registration.unregisteredDeferred.resolve();
         } catch (e) {
             registration.unregisteredDeferred.reject(e);
@@ -124,7 +124,7 @@ class Callee extends AbstractProcessor {
     //
 
     protected onMessage(msg: WampMessage): boolean {
-        const handled = [this.registrationRequests, this.unregistrationsRequests].some(
+        const handled = [this._registrationRequests, this._unregistrationsRequests].some(
             (pendingRequests) => {
                 const [handled, success, error] = pendingRequests.handle(msg);
                 if (handled && !success) {
@@ -139,7 +139,7 @@ class Callee extends AbstractProcessor {
 
         if (msg[0] === EWampMessageID.INVOCATION) {
             const [, requestId, registrationId, details, args, kwArgs] = msg;
-            const registration = this.registrations.get(registrationId);
+            const registration = this._registrations.get(registrationId);
             if (!registration) {
                 this.violator('Unexpected invocation (unable to find the related registration).');
                 return true;
@@ -166,23 +166,23 @@ class Callee extends AbstractProcessor {
                 requestId,
                 async (cid, msgToSend, finished) => {
                     if (finished) {
-                        this.runningCalls.delete(cid);
+                        this._runningCalls.delete(cid);
                     }
-                    if (!this.closed) {
+                    if (!this._closed) {
                         await this.sender(msgToSend);
                     }
                 },
                 this.violator,
                 this.logger,
             );
-            this.runningCalls.set(requestId, call);
+            this._runningCalls.set(requestId, call);
 
             return true;
         }
 
         if (msg[0] === EWampMessageID.INTERRUPT) {
             const requestId = msg[1];
-            const call = this.runningCalls.get(requestId);
+            const call = this._runningCalls.get(requestId);
 
             if (!call) {
                 this.violator('Unexpected interrupt (unable to find the related invocation).');
@@ -201,18 +201,18 @@ class Callee extends AbstractProcessor {
     }
 
     protected onClose(): void {
-        this.registrationRequests.close();
-        this.unregistrationsRequests.close();
+        this._registrationRequests.close();
+        this._unregistrationsRequests.close();
 
         // - Running invocations.
-        this.runningCalls.forEach((pendingCall) => { pendingCall.cancel(); });
-        this.runningCalls.clear();
+        this._runningCalls.forEach((pendingCall) => { pendingCall.cancel(); });
+        this._runningCalls.clear();
 
         // - Registrations.
-        this.registrations.forEach((registration) => {
+        this._registrations.forEach((registration) => {
             registration.unregisteredDeferred.reject('Callee closing.');
         });
-        this.registrations.clear();
+        this._registrations.clear();
     }
 }
 
