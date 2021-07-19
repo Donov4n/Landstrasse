@@ -234,7 +234,7 @@ class Connection {
         args?: A,
         kwargs?: K,
         opts?: PublishOptions,
-    ): Promise<WampID | void> {
+    ): Promise<WampID | undefined> {
         if (!this._processors) {
             return Promise.reject('Invalid session state.');
         }

@@ -36,7 +36,7 @@ class Publisher extends AbstractProcessor {
         args?: A,
         kwArgs?: K,
         options?: PublishOptions,
-    ): Promise<WampID | void> {
+    ): Promise<WampID | undefined> {
         if (this._closed) {
             throw new Error('Publisher already closed.');
         }

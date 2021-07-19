@@ -128,10 +128,9 @@ class Caller extends AbstractProcessor {
                 return true;
             }
             const [callRequest] = this._pendingCalls.get(requestId)!;
-
-            this.logger.log(LogLevel.WARNING, `Received error for call ${requestId}.`, msg[4]);
+            this.logger.log(LogLevel.WARNING, `Received \`${msg[4].toString()}\` error for call ${requestId}.`);
             this._pendingCalls.delete(requestId);
-            callRequest.reject(msg[4]);
+            callRequest.reject(new Error(msg[4]));
 
             return true;
         }

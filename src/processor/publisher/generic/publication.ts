@@ -7,9 +7,9 @@ class Publication {
 
     private _resolved = false;
 
-    private publishedDeferred = new Deferred<WampID | void>();
+    private publishedDeferred = new Deferred<WampID | undefined>();
 
-    public get promise(): Promise<WampID | void> {
+    public get promise(): Promise<WampID | undefined> {
         return this.publishedDeferred.promise;
     }
 
@@ -17,7 +17,7 @@ class Publication {
         this._requestId = requestId;
 
         if (!expectAck) {
-            this.publishedDeferred.resolve();
+            this.publishedDeferred.resolve(undefined);
             this._resolved = true;
         }
     }
