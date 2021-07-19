@@ -1,6 +1,6 @@
 {
     "name": "landstrasse",
-    "version": "0.6.5",
+    "version": "0.6.6",
     "description": "Strongly typed WAMP Client for browsers",
     "homepage": "https://github.com/Donov4n/Landstrasse",
     "license": "MIT",
