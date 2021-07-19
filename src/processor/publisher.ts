@@ -1,16 +1,15 @@
-import AbstractProcessor from '../AbstractProcessor';
-import Publication from './generic/publication';
-import PendingMap from '../../util/map';
-import { LogLevel } from '../../util/logger';
-import { WampID, EWampMessageID } from '../../types/messages/MessageTypes';
+import AbstractProcessor from './AbstractProcessor';
+import PendingMap from '../util/map';
+import { LogLevel } from '../util/logger';
+import { WampID, EWampMessageID } from '../types/messages/MessageTypes';
 
-import type { WampMessage } from '../../types/Protocol';
-import type { WampDict, WampList, WampURI } from '../../types/messages/MessageTypes';
+import type { WampMessage } from '../types/Protocol';
+import type { WampDict, WampList, WampURI } from '../types/messages/MessageTypes';
 import type {
     PublishOptions,
     WampPublishedMessage,
     WampPublishMessage,
-} from '../../types/messages/PublishMessage';
+} from '../types/messages/PublishMessage';
 
 class Publisher extends AbstractProcessor {
     public static getFeatures(): WampDict {
@@ -43,15 +42,8 @@ class Publisher extends AbstractProcessor {
 
         const requestId = this.idGenerators.session.id();
         const message: WampPublishMessage = [EWampMessageID.PUBLISH, requestId, options || {}, topic, args || [], kwArgs || {}];
-        this.logger.log(LogLevel.DEBUG, `Publishing "${topic}" (request id: ${requestId}).`, args, kwArgs, options);
-
-        const publication = new Publication(requestId, !!options?.acknowledge);
-        if (options?.acknowledge) {
-            this._publicationRequests.add(requestId).then(
-                (published) => { publication.acknowledge(published[2]); },
-                (err) => { publication.fail(err); },
-            );
-        }
+        const request = this._publicationRequests.add(requestId);
+        this.logger.log(LogLevel.DEBUG, `Publishing \`${topic}\` (request id: ${requestId}).`, args, kwArgs, options);
 
         try {
             await this.sender(message);
@@ -60,7 +52,12 @@ class Publisher extends AbstractProcessor {
             throw err;
         }
 
-        return publication.promise;
+        if (!options?.acknowledge) {
+            return Promise.resolve(undefined);
+        }
+
+        const [,, publicationId] = await request;
+        return publicationId;
     }
 
     //

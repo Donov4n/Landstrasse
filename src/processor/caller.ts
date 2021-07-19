@@ -48,7 +48,7 @@ class Caller extends AbstractProcessor {
         const withProgress = !!details?.receive_progress;
         const requestId = this.idGenerators.session.id();
         const message: WampCallMessage = [EWampMessageID.CALL, requestId, details || {}, uri, args || [], kwArgs || {}];
-        this.logger.log(LogLevel.DEBUG, `Calling "${uri}" (request id: ${requestId}).`, args, kwArgs, details);
+        this.logger.log(LogLevel.DEBUG, `Calling \`${uri}\` (request id: ${requestId}).`, args, kwArgs, details);
 
         const executor = async () => {
             const result = new Deferred<CallResult<RA, RK>>();
@@ -57,7 +57,7 @@ class Caller extends AbstractProcessor {
             try {
                 await this.sender(message);
             } catch (err) {
-                this.logger.log(LogLevel.WARNING, `Call to "${uri}" failed.`, err);
+                this.logger.log(LogLevel.WARNING, `Call to \`${uri}\` failed.`, err);
                 this._pendingCalls.delete(requestId);
                 throw err;
             }
@@ -140,7 +140,7 @@ class Caller extends AbstractProcessor {
 
     protected onClose(): void {
         this._pendingCalls.forEach(([request]) => {
-            request.reject('Caller closing.');
+            request.reject(new Error('closing'));
         });
         this._pendingCalls.clear();
     }
