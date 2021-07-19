@@ -32,23 +32,22 @@ class Call {
         details = details || {};
         details.onCancel = this._cancelledDeferred.promise;
 
-        // We want to actively catch rejected cancel promises.
-        // Rejecting this cancel promise means, that the call wasn't canceled and completed, so
-        // dropping any error is fine here.
-        this._cancelledDeferred.promise.catch(() => {});
         this.progress = details && !!details.receive_progress;
 
-        setTimeout(
-            () => {
-                handler(args, kwArgs, details)
-                    .then(
-                        (res) => this.onHandlerResult(res),
-                        (err) => this.onHandlerError(err),
-                    )
-                    .catch((e) => this.violator(`Failed to send: ${e}`));
-            },
-            0
-        );
+        // We want to actively catch rejected cancel promises.
+        // Rejecting this cancel promise means, that the call wasn't canceled
+        // and completed, so dropping any error is fine here.
+        this._cancelledDeferred.promise.catch(() => {});
+
+        const handle = () => {
+            handler(args, kwArgs, details)
+                .then(
+                    (res) => this.onHandlerResult(res),
+                    (err) => this.onHandlerError(err),
+                )
+                .catch((e) => this.violator(`Failed to send: ${e}`));
+        };
+        setTimeout(handle, 0);
     }
 
     public cancel(): void {
@@ -64,7 +63,8 @@ class Call {
     //
 
     private async onHandlerResult(res: CallResult<WampList, WampDict>): Promise<void> {
-        if (!res.nextResult || this.progress) {
+        const isFinished = !res.nextResult;
+        if (isFinished || this.progress) {
             const message: WampYieldMessage = [
                 EWampMessageID.YIELD,
                 this.callId,
@@ -73,12 +73,8 @@ class Call {
                 res.kwArgs || {},
             ];
 
-            if (!res.nextResult && !this.cancelled) {
-                this._cancelledDeferred.reject();
-            }
-
             try {
-                await this.sender(this.callId, message, !res.nextResult);
+                await this.sender(this.callId, message, isFinished);
             } catch (err) {
                 if (err instanceof SerializationError) {
                     this.logger.log(
@@ -112,12 +108,7 @@ class Call {
             this.logger.log(LogLevel.WARNING, 'A runtime error occurred.', err);
             wampError = new WampError<any>('wamp.error.runtime_error', [err]);
         }
-
         const errorMessage = wampError.toErrorMessage(this.callId);
-
-        if (!this.cancelled) {
-            this._cancelledDeferred.reject();
-        }
 
         this.logger.log(
             LogLevel.DEBUG,

@@ -73,7 +73,7 @@ class Callee extends AbstractProcessor {
         const requestId = this.idGenerators.session.id();
         const message: WampRegisterMessage = [EWampMessageID.REGISTER, requestId, options || {}, uri];
         const request = this._registrationRequests.add(requestId);
-        this.logger.log(LogLevel.DEBUG, `Registering "${uri}" (request id: ${requestId}).`, options);
+        this.logger.log(LogLevel.DEBUG, `Registering \`${uri}\` (request id: ${requestId}).`, options);
 
         try {
             await this.sender(message);
@@ -147,7 +147,7 @@ class Callee extends AbstractProcessor {
 
             this.logger.log(
                 LogLevel.DEBUG,
-                `Call received for registration "${registration.uri}" (request id: ${requestId}).`,
+                `Call received for registration \`${registration.uri}\` (request id: ${requestId}).`,
                 args,
                 kwArgs,
                 details,
@@ -181,18 +181,18 @@ class Callee extends AbstractProcessor {
         }
 
         if (msg[0] === EWampMessageID.INTERRUPT) {
-            const requestId = msg[1];
-            const call = this._runningCalls.get(requestId);
-
+            const callId = msg[1];
+            const call = this._runningCalls.get(callId);
             if (!call) {
                 this.violator('Unexpected interrupt (unable to find the related invocation).');
-            } else {
-                this.logger.log(
-                    LogLevel.DEBUG,
-                    `Received cancellation request for invocation (request id: ${requestId}).`
-                );
-                call.cancel();
+                return true;
             }
+
+            this.logger.log(
+                LogLevel.DEBUG,
+                `Received cancellation request for invocation (invocation id: ${callId}).`
+            );
+            call.cancel();
 
             return true;
         }
@@ -210,7 +210,7 @@ class Callee extends AbstractProcessor {
 
         // - Registrations.
         this._registrations.forEach((registration) => {
-            registration.unregisteredDeferred.reject('Callee closing.');
+            registration.unregisteredDeferred.reject(new Error('closing'));
         });
         this._registrations.clear();
     }

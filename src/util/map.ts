@@ -69,7 +69,7 @@ class PendingMap<TSucMsg extends WampMessage> {
                 return [true, false, `Unexpected ${EWampMessageID[this.initMsg]} error.`];
             }
 
-            pendingRequest.reject(msg[4]);
+            pendingRequest.reject(new Error(msg[4]));
             return [true, true, ''];
         }
 
