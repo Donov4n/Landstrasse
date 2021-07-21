@@ -159,10 +159,10 @@ class Callee extends AbstractProcessor {
             }
 
             const call = new Call(
-                registration.handler, // Call Handler function
-                args || [], // Args or empty array
-                kwArgs || {}, // KwArgs or empty object
-                details || {}, // Options or empty object
+                registration.handler,
+                args || [],
+                kwArgs || {},
+                details || {},
                 requestId,
                 async (cid, msgToSend, finished) => {
                     if (finished) {

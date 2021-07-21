@@ -59,7 +59,15 @@ class Subscriptions {
         );
 
         this._subscriptions.forEach((subscription: Subscription) => {
-            subscription.handler(args, kwArgs, details);
+            try {
+                subscription.handler(args, kwArgs, details);
+            } catch (error) {
+                this.logger.log(
+                    LogLevel.WARNING,
+                    `Error thrown while executing a callback for the subscription "${this.uri}".`,
+                    error
+                );
+            }
         });
     }
 
@@ -73,7 +81,7 @@ class Subscriptions {
             throw new Error('Unexpected unsubscribe (unable to find the related subscription).');
         }
 
-        this.logger.log(LogLevel.DEBUG, `Unsubscribing ${requestId} from "${this.uri}".`);
+        this.logger.log(LogLevel.DEBUG, `Unsubscribing ${requestId} from \`${this.uri}\`.`);
         this._subscriptions.delete(requestId);
 
         if (this._subscriptions.size === 0) {

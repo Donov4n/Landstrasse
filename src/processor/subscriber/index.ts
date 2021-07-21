@@ -71,7 +71,7 @@ class Subscriber extends AbstractProcessor {
         const requestId = this.idGenerators.session.id();
         const message: WampSubscribeMessage = [EWampMessageID.SUBSCRIBE, requestId, options || {}, topic];
         const request = this._subscriptionRequests.add(requestId);
-        this.logger.log(LogLevel.DEBUG, `Subscribing to "${topic}" (request id: ${requestId}).`, options);
+        this.logger.log(LogLevel.DEBUG, `Subscribing to \`${topic}\` (request id: ${requestId}).`, options);
 
         try {
             await this.sender(message);
