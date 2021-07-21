@@ -1,4 +1,4 @@
-class Deferred<T = void> {
+class Deferred<T = any> {
     public readonly promise: Promise<T>;
 
     private _resolveInternal?: (value: T) => void;

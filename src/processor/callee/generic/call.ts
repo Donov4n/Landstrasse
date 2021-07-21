@@ -6,7 +6,7 @@ import { EWampMessageID } from '../../../types/messages/MessageTypes';
 
 import type { WampMessage } from '../../../types/Protocol';
 import type { ProtocolViolator } from '../../AbstractProcessor';
-import type { CallHandler, CallResult } from '../../../types/Connection';
+import type { CallHandler } from '../../../types/Connection';
 import type { InvocationDetails, WampYieldMessage } from '../../../types/messages/CallMessage';
 import type { WampDict, WampID, WampList } from '../../../types/messages/MessageTypes';
 
@@ -18,7 +18,7 @@ class Call {
     private _cancelledDeferred = new Deferred<void>();
 
     constructor(
-        handler: CallHandler<WampList, WampDict, WampList, WampDict>,
+        handler: CallHandler,
         args: WampList,
         kwArgs: WampDict,
         details: InvocationDetails,
@@ -62,16 +62,48 @@ class Call {
     // - Handlers.
     //
 
-    private async onHandlerResult(res: CallResult<WampList, WampDict>): Promise<void> {
-        const isFinished = !res.nextResult;
+    private async onHandlerResult(response: unknown): Promise<void> {
+        let _response: { result: unknown, next?: Promise<unknown> };
+        if (typeof response !== 'object' || response === null || !('result' in response)) {
+            _response = { result: response };
+        } else {
+            _response = response as { result: unknown, next?: Promise<unknown> };
+        }
+        const { result, next } = _response;
+
+        const isFinished = !next;
         if (isFinished || this.progress) {
             const message: WampYieldMessage = [
                 EWampMessageID.YIELD,
                 this.callId,
-                { progress: !!res.nextResult && this.progress },
-                res.args || [],
-                res.kwArgs || {},
+                { progress: !!_response.next && this.progress },
             ];
+
+            if (typeof result === 'object' && result !== null && ('args' in result || 'kwargs' in result)) {
+                const { args, kwargs } = (result as { args?: unknown, kwargs?: unknown });
+
+                const isValidArgs = !args || Array.isArray(args);
+                const isValidKwargs = !kwargs || typeof kwargs === 'object';
+                if (!isValidArgs || !isValidKwargs) {
+                    this.logger.log(
+                        LogLevel.WARNING,
+                        `Invalid result for call id "${this.callId}", sending error.`,
+                        [isValidArgs, args],
+                        [isValidKwargs, kwargs],
+                    );
+                    return this.onHandlerError(new WampError('wamp.error.runtime_error'));
+                }
+
+                const hasKwargs = kwargs && Object.keys(kwargs as Record<any, string>).length;
+                if ((args as any[]).length || hasKwargs) {
+                    message.push(args as any[]);
+                    if (hasKwargs) {
+                        message.push(kwargs as Record<any, string>);
+                    }
+                }
+            } else {
+                message.push([result]);
+            }
 
             try {
                 await this.sender(this.callId, message, isFinished);
@@ -88,10 +120,10 @@ class Call {
             this.logger.log(LogLevel.DEBUG, `Call id "${this.callId}", sending yield.`);
         }
 
-        if (res.nextResult) {
-            res.nextResult
+        if (next) {
+            next
                 .then(
-                    (result) => this.onHandlerResult(result),
+                    (_response) => this.onHandlerResult(_response),
                     (error) => this.onHandlerError(error),
                 )
                 .catch((e) => this.violator(`Failed to send: ${e}`));

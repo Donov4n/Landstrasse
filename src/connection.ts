@@ -75,9 +75,11 @@ class Connection {
 
     private _state: ConnectionStateMachine;
 
-    private _openedDeferred: Deferred<WelcomeDetails> | null = null;
+    private _openingDeferred: Deferred<WelcomeDetails> | null = null;
 
-    private _closedDeferred: Deferred | null = null;
+    private _openedDeferred: Deferred<void> | null = null;
+
+    private _closedDeferred: Deferred<void> | null = null;
 
     private _closeRequested: boolean = false;
 
@@ -114,11 +116,23 @@ class Connection {
     }
 
     public get isConnecting(): boolean {
-        return !!this._openedDeferred;
+        return !!this._openingDeferred;
     }
 
     public get isRetrying(): boolean {
         return this._isRetrying;
+    }
+
+    public get onOpen(): Promise<void> {
+        if (this.isConnected) {
+            return Promise.resolve();
+        }
+
+        if (!this._openedDeferred) {
+            this._openedDeferred = new Deferred<void>();
+        }
+
+        return this._openedDeferred.promise;
     }
 
     constructor(endpoint: string, realm: string, options: Options) {
@@ -137,8 +151,8 @@ class Connection {
     }
 
     public open(): Promise<WelcomeDetails> {
-        if (this._openedDeferred) {
-            return this._openedDeferred.promise;
+        if (this._openingDeferred) {
+            return this._openingDeferred.promise;
         }
 
         if (this.isConnected || this._transport) {
@@ -149,7 +163,7 @@ class Connection {
         this._closeRequested = false;
 
         this._logger.log(LogLevel.DEBUG, 'Opening Connection.');
-        const deferred = this._openedDeferred = new Deferred();
+        const deferred = this._openingDeferred = new Deferred();
         this._open();
 
         return deferred.promise;
@@ -192,12 +206,12 @@ class Connection {
     // - WAMP methods.
     //
 
-    public call<A extends WampList = WampList, K extends WampDict = WampDict, RA extends WampList = WampList, RK extends WampDict = WampDict>(
+    public call<A extends WampList = WampList, K extends WampDict = WampDict, T = any>(
         uri: WampURI,
         args?: A,
         kwargs?: K,
         opts?: CallOptions,
-    ): CallReturn<RA, RK> {
+    ): CallReturn<T> {
         if (!this._processors) {
             return [
                 Promise.reject('Invalid session state.'),
@@ -207,9 +221,9 @@ class Connection {
         return this._processors[2].call(uri, args, kwargs, opts);
     }
 
-    public register<A extends WampList = WampList, K extends WampDict = WampDict, RA extends WampList = WampList, RK extends WampDict = WampDict>(
+    public register<A extends WampList = WampList, K extends WampDict = WampDict, T = any>(
         uri: WampURI,
-        handler: CallHandler<A, K, RA, RK>,
+        handler: CallHandler<A, K, T>,
         opts?: RegisterOptions,
     ): Promise<Registration> {
         if (!this._processors) {
@@ -460,8 +474,13 @@ class Connection {
         if (!(details instanceof Error)) {
             this.resetRetry();
             this._options.onOpen?.(details);
-            this._openedDeferred?.resolve(details);
+
+            this._openingDeferred?.resolve(details);
+            this._openingDeferred = null;
+
+            this._openedDeferred?.resolve();
             this._openedDeferred = null;
+
             return true;
         }
 
@@ -471,8 +490,8 @@ class Connection {
             return true;
         }
 
-        this._openedDeferred?.reject(details);
-        this._openedDeferred = null;
+        this._openingDeferred?.reject(details);
+        this._openingDeferred = null;
         return true;
     }
 
@@ -495,8 +514,8 @@ class Connection {
         }
 
         if (this.isConnecting) {
-            this._openedDeferred?.reject(connectionError);
-            this._openedDeferred = null;
+            this._openingDeferred?.reject(connectionError);
+            this._openingDeferred = null;
         }
 
         if (this._closedDeferred) {
@@ -514,8 +533,8 @@ class Connection {
             return;
         }
 
-        if (!this._openedDeferred) {
-            this._openedDeferred = new Deferred();
+        if (!this._openingDeferred) {
+            this._openingDeferred = new Deferred();
         }
 
         this._state = new ConnectionStateMachine();

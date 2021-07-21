@@ -61,9 +61,9 @@ class Callee extends AbstractProcessor {
         },
     );
 
-    public async register<A extends WampList, K extends WampDict, RA extends WampList, RK extends WampDict>(
+    public async register<A extends WampList, K extends WampDict, T = any>(
         uri: string,
-        handler: CallHandler<A, K, RA, RK>,
+        handler: CallHandler<A, K, T>,
         options?: RegisterOptions,
     ): Promise<Registration> {
         if (this._closed) {

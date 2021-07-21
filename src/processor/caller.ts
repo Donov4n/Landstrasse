@@ -3,7 +3,7 @@ import Deferred from '../util/deferred';
 import { LogLevel } from '../util/logger';
 import { EWampMessageID } from '../types/messages/MessageTypes';
 
-import type { CallResult, CallReturn } from '../types/Connection';
+import type { CallReturn } from '../types/Connection';
 import type { WampMessage } from '../types/Protocol';
 import type { WampDict, WampID, WampList, WampURI } from '../types/messages/MessageTypes';
 import type {
@@ -12,8 +12,6 @@ import type {
     WampCallMessage,
     WampCancelMessage,
 } from '../types/messages/CallMessage';
-
-type CallRequest = Deferred<CallResult<WampList, WampDict>>;
 
 class Caller extends AbstractProcessor {
     public static getFeatures(): WampDict {
@@ -30,14 +28,14 @@ class Caller extends AbstractProcessor {
         };
     }
 
-    private _pendingCalls = new Map<WampID, [request: CallRequest, withProgress: boolean]>();
+    private _pendingCalls = new Map<WampID, [request: Deferred, withProgress: boolean]>();
 
-    public call<A extends WampList, K extends WampDict, RA extends WampList, RK extends WampDict>(
+    public call<A extends WampList, K extends WampDict, T = any>(
         uri: WampURI,
         args?: A,
         kwArgs?: K,
         details?: CallOptions,
-    ): CallReturn<RA, RK> {
+    ): CallReturn<T> {
         if (this._closed) {
             return [
                 Promise.reject('Caller closed.'),
@@ -51,8 +49,8 @@ class Caller extends AbstractProcessor {
         this.logger.log(LogLevel.DEBUG, `Calling \`${uri}\` (request id: ${requestId}).`, args, kwArgs, details);
 
         const executor = async () => {
-            const result = new Deferred<CallResult<RA, RK>>();
-            this._pendingCalls.set(requestId, [result as Deferred<CallResult<any, any>>, withProgress]);
+            const result = new Deferred<T>();
+            this._pendingCalls.set(requestId, [result, withProgress]);
 
             try {
                 await this.sender(message);
@@ -102,20 +100,27 @@ class Caller extends AbstractProcessor {
             const resultArgs = msg[3] || [];
             const resultKwargs = msg[4] || {};
 
+            let result = null;
+            if (resultArgs.length > 1 || Object.keys(resultKwargs).length > 0) {
+                result = { args: resultArgs, kwargs: resultKwargs };
+            } else if (resultArgs.length > 0) {
+                result = resultArgs[0];
+            }
+
             if (details.progress) {
-                this.logger.log(LogLevel.DEBUG, `Received call progress for call ${requestId}.`, resultArgs, resultKwargs);
+                this.logger.log(LogLevel.DEBUG, `Received call progress for call ${requestId}.`, result);
 
                 if (!awaitedProgress) {
                     this.violator('Unexpected progress received for a call without progress requested.');
                     return true;
                 }
 
-                const nextCallRequest = new Deferred<CallResult<WampList, WampDict>>();
-                callRequest.resolve({ args: resultArgs, kwArgs: resultKwargs, nextResult: nextCallRequest.promise });
+                const nextCallRequest = new Deferred();
+                callRequest.resolve({ result, next: nextCallRequest.promise });
                 this._pendingCalls.set(requestId, [nextCallRequest, true]);
             } else {
-                this.logger.log(LogLevel.DEBUG, `Received result for call ${requestId}.`, resultArgs, resultKwargs);
-                callRequest.resolve({ args: resultArgs, kwArgs: resultKwargs, nextResult: null });
+                this.logger.log(LogLevel.DEBUG, `Received result for call ${requestId}.`, result);
+                callRequest.resolve(result);
                 this._pendingCalls.delete(requestId);
             }
             return true;

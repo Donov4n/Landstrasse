@@ -66,31 +66,18 @@ export type RetryInfos =
     | { count: null, delay: null, willRetry: false }
     | { count: number, delay: number, willRetry: true };
 
-export type CallResult<
-    TArgs extends WampList = WampList,
-    TKwArgs extends WampDict = WampDict,
-> = {
-    args: TArgs;
-    kwArgs: TKwArgs;
-    nextResult?: Promise<CallResult<TArgs, TKwArgs>> | null;
-};
-
 export type CallCancel = (killMode?: ECallKillMode) => Promise<void>;
-export type CallReturn<
-    RA extends WampList = WampList,
-    RK extends WampDict = WampDict,
-> = [Promise<CallResult<RA, RK>>, CallCancel];
+export type CallReturn<T = any> = [Promise<T>, CallCancel];
 
 export type CallHandler<
     TA extends WampList = WampList,
     TKwA extends WampDict = WampDict,
-    TRA extends WampList = WampList,
-    TRKwA extends WampDict = WampDict,
+    T = any,
 > = (
     args: TA,
     kwArgs: TKwA,
     details: InvocationDetails,
-) => Promise<CallResult<TRA, TRKwA>>;
+) => Promise<T>;
 
 export type EventHandler<
     TA extends WampList = WampList,

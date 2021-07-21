@@ -1,10 +1,9 @@
 import Deferred from '../../../util/deferred';
 
 import type { CallHandler } from '../../../types/Connection';
-import type { WampDict, WampID, WampList, WampURI } from '../../../types/messages/MessageTypes';
+import type { WampID, WampURI } from '../../../types/messages/MessageTypes';
 
 type UnregisterCallback = (registration: Registration) => Promise<void>;
-type RegistrationHandler = CallHandler<WampList, WampDict, WampList, WampDict>;
 
 class Registration {
     private readonly _id: WampID;
@@ -12,7 +11,7 @@ class Registration {
 
     private _unregisterCallback: UnregisterCallback;
 
-    public readonly handler: RegistrationHandler;
+    public readonly handler: CallHandler;
 
     public unregisteredDeferred = new Deferred<void>();
 
@@ -31,7 +30,7 @@ class Registration {
     constructor(
         id: WampID,
         uri: WampURI,
-        handler: RegistrationHandler,
+        handler: CallHandler,
         unregisterCallback: UnregisterCallback,
     ) {
         this._id = id;
